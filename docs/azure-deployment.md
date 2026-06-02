@@ -51,6 +51,14 @@ Storage Blob Data Contributor
 Storage Table Data Contributor
 ```
 
+The signed-in Azure user is granted these reader roles on the storage account
+for querying captured data:
+
+```text
+Storage Blob Data Reader
+Storage Table Data Reader
+```
+
 ## GitHub Secrets
 
 The workflow requires these repository secrets:

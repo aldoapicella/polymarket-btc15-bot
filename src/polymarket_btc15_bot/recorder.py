@@ -90,7 +90,8 @@ class AzureStorageRecorder:
     def _append_blob_line(self, blob_name: str, line: str) -> None:
         blob = self.container.get_blob_client(blob_name)
         with suppress(Exception):
-            blob.create_append_blob()
+            if not blob.exists():
+                blob.create_append_blob()
         blob.append_block(line.encode("utf-8"))
 
     def _index_event(

@@ -1,0 +1,226 @@
+{
+  "info": {
+    "_postman_id": "2f2fd85a-31b8-4d9d-a3d6-7d20acb8a2a4",
+    "name": "Polymarket BTC 15m Bot API",
+    "description": "Postman collection for the authenticated BTC 15-minute Polymarket paper bot API deployed on Azure Container Apps.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{api_bearer_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.environment.get('api_bearer_token')) {",
+          "  console.warn('Set api_bearer_token in the selected Postman environment before calling protected endpoints.');",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/health",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "health"
+          ]
+        },
+        "description": "Returns basic API health, execution mode, and kill-switch state."
+      }
+    },
+    {
+      "name": "Status",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/status",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "status"
+          ]
+        },
+        "description": "Returns current bot state, latest reference, market/book counts, tracked open orders, latest decisions, and latest execution reports."
+      }
+    },
+    {
+      "name": "Discover Markets",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/discover",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "discover"
+          ]
+        },
+        "description": "Runs one BTC 15m market discovery pass and returns discovered markets."
+      }
+    },
+    {
+      "name": "Confirm Resolution Source",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/confirm-source",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "confirm-source"
+          ]
+        },
+        "description": "Checks whether the configured BTC 15m source confirmation path recognizes the Chainlink BTC/USD resolution source."
+      }
+    },
+    {
+      "name": "Evaluate - No Execute",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/evaluate?execute=false",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "evaluate"
+          ],
+          "query": [
+            {
+              "key": "execute",
+              "value": "false"
+            }
+          ]
+        },
+        "description": "Runs one strategy evaluation pass without submitting paper/live execution decisions."
+      }
+    },
+    {
+      "name": "Evaluate - Execute Paper Decisions",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/evaluate?execute=true",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "evaluate"
+          ],
+          "query": [
+            {
+              "key": "execute",
+              "value": "true"
+            }
+          ]
+        },
+        "description": "Runs one strategy evaluation pass and submits any resulting decisions to the configured execution client. Azure is deployed in paper mode."
+      }
+    },
+    {
+      "name": "Enable Kill Switch",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"enabled\": true\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/kill-switch",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "kill-switch"
+          ]
+        },
+        "description": "Creates the kill-switch file. The bot will stop placing/cancel active quotes according to risk behavior."
+      }
+    },
+    {
+      "name": "Disable Kill Switch",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"enabled\": false\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/kill-switch",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "kill-switch"
+          ]
+        },
+        "description": "Removes the kill-switch file."
+      }
+    },
+    {
+      "name": "OpenAPI JSON",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/openapi.json",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "openapi.json"
+          ]
+        },
+        "description": "FastAPI OpenAPI schema. This route is generated by FastAPI and is not protected by the bearer dependency."
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://polymarket-btc15-dev.calmground-23567c32.eastus.azurecontainerapps.io",
+      "type": "string"
+    }
+  ]
+}

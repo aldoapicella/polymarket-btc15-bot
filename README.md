@@ -52,6 +52,8 @@ Replay assumptions are documented in [docs/backtesting.md](docs/backtesting.md).
 
 Azure deployment, authentication, and event-query instructions are documented
 in [docs/azure-deployment.md](docs/azure-deployment.md).
+Postman import and token setup instructions are documented in
+[docs/postman.md](docs/postman.md).
 
 Confirm the Polymarket/Chainlink BTC 15m source:
 

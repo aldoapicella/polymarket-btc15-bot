@@ -264,7 +264,7 @@ class AzureStorageRecorder:
 
     @staticmethod
     def _blob_name(recorded_ts: datetime) -> str:
-        return f"events/{recorded_ts:%Y/%m/%d/%H}.jsonl"
+        return f"events/{recorded_ts:%Y/%m/%d/%H/%M}.jsonl"
 
     @classmethod
     def _queued_event(

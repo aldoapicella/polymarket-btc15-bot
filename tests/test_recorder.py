@@ -49,7 +49,7 @@ def test_azure_flush_batches_multiple_events_into_one_append_block() -> None:
 
     recorder._flush_batch(events)
 
-    blob = recorder.container.blobs["events/2026/06/02/16.jsonl"]
+    blob = recorder.container.blobs["events/2026/06/02/16/00.jsonl"]
     assert blob.created
     assert len(blob.blocks) == 1
     assert blob.blocks[0].count(b"\n") == 3

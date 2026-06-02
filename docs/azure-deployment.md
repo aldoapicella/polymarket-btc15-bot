@@ -102,10 +102,10 @@ Requests without the bearer token receive `401`.
 
 ## Data Layout
 
-Every recorded event is written to hourly append blobs:
+Every recorded event is written to minute-segmented append blobs:
 
 ```text
-bot-events/events/YYYY/MM/DD/HH.jsonl
+bot-events/events/YYYY/MM/DD/HH/mm.jsonl
 ```
 
 Azure writes are queued and batched in a background recorder thread. The bot
@@ -187,6 +187,9 @@ payloadJson
 avoid noisy table writes. Add `book` to `AZURE_EVENT_INDEX_TYPES` only if the
 extra query convenience is worth the write volume.
 
+This minute segmentation prevents a single high-volume hourly blob from
+reaching Azure Append Blob's committed block limit during soak tests.
+
 ## Query Examples
 
 Get deployment outputs:
@@ -212,15 +215,15 @@ az storage blob list \
   -o tsv
 ```
 
-Download an hourly replay file:
+Download a minute replay segment:
 
 ```bash
 az storage blob download \
   --auth-mode login \
   --account-name "$storage_account" \
   --container-name bot-events \
-  --name events/2026/06/02/15.jsonl \
-  --file data/replay-2026-06-02-15.jsonl
+  --name events/2026/06/02/15/42.jsonl \
+  --file data/replay-2026-06-02-15-42.jsonl
 ```
 
 Query recent reference events:

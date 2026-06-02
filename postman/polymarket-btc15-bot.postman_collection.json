@@ -64,12 +64,12 @@
       }
     },
     {
-      "name": "PnL",
+      "name": "PnL - Current UTC Day",
       "request": {
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "{{base_url}}/pnl?source=auto",
+          "raw": "{{base_url}}/pnl?source=azure&settlement_window_seconds={{settlement_window_seconds}}",
           "host": [
             "{{base_url}}"
           ],
@@ -79,11 +79,127 @@
           "query": [
             {
               "key": "source",
-              "value": "auto"
+              "value": "azure"
+            },
+            {
+              "key": "settlement_window_seconds",
+              "value": "{{settlement_window_seconds}}"
             }
           ]
         },
-        "description": "Returns actual paper PnL from filled execution reports and replay-estimated maker PnL from captured decisions, books, and Chainlink settlement prices. In Azure, source=auto reads today's Azure Blob event data."
+        "description": "Runs Azure Blob-backed PnL replay for the current UTC day. This can be slow because it replays captured book events. The replay estimate is cancellation-aware and excludes orders after cancel_all or cancellation execution reports."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('PnL response is OK', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const body = pm.response.json();",
+              "pm.test('PnL summary exists', function () {",
+              "  pm.expect(body).to.have.property('summary');",
+              "  pm.expect(body.summary).to.have.property('actual_paper_net_pnl');",
+              "  pm.expect(body.summary).to.have.property('replay_estimate_net_pnl');",
+              "});",
+              "pm.test('Replay cancellation metrics exist', function () {",
+              "  pm.expect(body.replay_estimate).to.have.property('replay_metrics');",
+              "  pm.expect(body.replay_estimate.replay_metrics).to.have.property('cancel_decisions_seen');",
+              "  pm.expect(body.replay_estimate.replay_metrics).to.have.property('cancel_execution_reports_seen');",
+              "  pm.expect(body.replay_estimate.replay_metrics).to.have.property('fills_after_cancel_prevented');",
+              "});",
+              "console.log('actual_paper_net_pnl:', body.summary.actual_paper_net_pnl);",
+              "console.log('replay_estimate_net_pnl:', body.summary.replay_estimate_net_pnl);",
+              "console.log('replay_metrics:', body.replay_estimate.replay_metrics);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "PnL - Azure Prefix Replay",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/pnl?source=azure&prefix={{pnl_prefix}}&settlement_window_seconds={{settlement_window_seconds}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "pnl"
+          ],
+          "query": [
+            {
+              "key": "source",
+              "value": "azure"
+            },
+            {
+              "key": "prefix",
+              "value": "{{pnl_prefix}}"
+            },
+            {
+              "key": "settlement_window_seconds",
+              "value": "{{settlement_window_seconds}}"
+            }
+          ]
+        },
+        "description": "Runs a targeted Azure Blob-backed PnL replay for the configured prefix. Use short prefixes such as events/YYYY/MM/DD/HH/ for interactive checks. This is the recommended request for investigating a specific hour."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('PnL prefix response is OK', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const body = pm.response.json();",
+              "pm.test('Azure source matches requested prefix', function () {",
+              "  pm.expect(body.source.type).to.eql('azure_storage');",
+              "  pm.expect(body.source.prefix).to.eql(pm.environment.get('pnl_prefix'));",
+              "});",
+              "pm.test('Replay cancellation metrics exist', function () {",
+              "  pm.expect(body.replay_estimate.replay_metrics).to.have.property('orders_cancelled');",
+              "  pm.expect(body.replay_estimate.replay_metrics).to.have.property('open_orders_remaining');",
+              "  pm.expect(body.replay_estimate.replay_metrics).to.have.property('fills_after_cancel_prevented');",
+              "});",
+              "console.log('actual_paper_net_pnl:', body.summary.actual_paper_net_pnl);",
+              "console.log('replay_estimate_net_pnl:', body.summary.replay_estimate_net_pnl);",
+              "console.log('replay_metrics:', body.replay_estimate.replay_metrics);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "PnL - Local Container File",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/pnl?source=local&settlement_window_seconds={{settlement_window_seconds}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "pnl"
+          ],
+          "query": [
+            {
+              "key": "source",
+              "value": "local"
+            },
+            {
+              "key": "settlement_window_seconds",
+              "value": "{{settlement_window_seconds}}"
+            }
+          ]
+        },
+        "description": "Reads only the current container revision's local data/events.jsonl file. On Azure this resets across deployments, so use Azure-backed PnL for historical reporting."
       }
     },
     {

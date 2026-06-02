@@ -54,7 +54,9 @@ Authorization: Bearer {{api_bearer_token}}
 ```text
 GET  /health
 GET  /status
-GET  /pnl
+GET  /pnl?source=azure
+GET  /pnl?source=azure&prefix={{pnl_prefix}}
+GET  /pnl?source=local
 POST /discover
 POST /confirm-source
 POST /evaluate?execute=false
@@ -67,20 +69,33 @@ GET  /openapi.json
 require the bearer token.
 
 `/pnl` separates actual paper execution from replay-estimated maker fills.
-On Azure, `source=auto` reads Azure Blob Storage for the current UTC day by
-default, so it survives container restarts and deployments.
+Use the Azure-backed requests for real reporting because local container files
+reset across deployments.
 
 - `actual_paper` uses execution reports with positive `filled_size`.
 - `replay_estimate` replays post-only decisions against captured books and
   settlement prices.
+- `replay_estimate.replay_metrics` includes cancellation-aware metrics such as
+  `cancel_decisions_seen`, `cancel_execution_reports_seen`,
+  `orders_cancelled`, `open_orders_remaining`, and
+  `fills_after_cancel_prevented`.
 
 Useful query parameters:
 
 ```text
 source=auto|azure|local
-prefix=events/YYYY/MM/DD/
+prefix=events/YYYY/MM/DD/HH/
 settlement_window_seconds=15
 ```
+
+For interactive checks, prefer a short prefix:
+
+```text
+events/2026/06/02/17/
+```
+
+The full current-day Azure replay can be slow because it downloads and replays
+all captured book events for the day.
 
 ## Quick Check
 

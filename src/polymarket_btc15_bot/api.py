@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import suppress
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status as http_status
 from pydantic import BaseModel
 
 from .bot import PolymarketBtc15Bot
 from .config import Settings, load_settings
-from .pnl import build_pnl_report
+from .pnl import build_azure_pnl_report, build_pnl_report
 from .source_confirmation import confirm_source
 
 
@@ -67,7 +67,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return bot.status()
 
     @app.get("/pnl", dependencies=[Depends(require_auth)])
-    async def pnl(settlement_window_seconds: int = 15) -> dict[str, Any]:
+    async def pnl(
+        settlement_window_seconds: int = 15,
+        source: Literal["auto", "local", "azure"] = "auto",
+        prefix: str | None = None,
+    ) -> dict[str, Any]:
+        if source == "azure" or (source == "auto" and config.azure_storage_account_name):
+            return await asyncio.to_thread(
+                build_azure_pnl_report,
+                config,
+                prefix,
+                settlement_window_seconds,
+            )
         return await asyncio.to_thread(
             build_pnl_report,
             config.recorder_path,

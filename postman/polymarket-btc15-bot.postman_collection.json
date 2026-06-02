@@ -69,15 +69,21 @@
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "{{base_url}}/pnl",
+          "raw": "{{base_url}}/pnl?source=auto",
           "host": [
             "{{base_url}}"
           ],
           "path": [
             "pnl"
+          ],
+          "query": [
+            {
+              "key": "source",
+              "value": "auto"
+            }
           ]
         },
-        "description": "Returns actual paper PnL from filled execution reports and replay-estimated maker PnL from captured decisions, books, and Chainlink settlement prices."
+        "description": "Returns actual paper PnL from filled execution reports and replay-estimated maker PnL from captured decisions, books, and Chainlink settlement prices. In Azure, source=auto reads today's Azure Blob event data."
       }
     },
     {

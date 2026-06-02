@@ -98,7 +98,10 @@ class ReplayBacktester:
         self.notes: list[str] = []
 
     def run(self) -> BacktestResult:
-        for event in _iter_jsonl(self.config.path):
+        return self.run_events(_iter_jsonl(self.config.path))
+
+    def run_events(self, events: Any) -> BacktestResult:
+        for event in events:
             self.event_count += 1
             self._handle_event(event)
         return self._result()
@@ -338,4 +341,3 @@ def _best_ask(payload: dict[str, Any]) -> Decimal | None:
     prices = [_decimal(item.get("price")) for item in asks if isinstance(item, dict)]
     prices = [price for price in prices if price is not None]
     return min(prices) if prices else None
-

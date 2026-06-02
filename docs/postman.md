@@ -66,11 +66,21 @@ GET  /openapi.json
 `/openapi.json` is FastAPI's generated schema route. The operational routes
 require the bearer token.
 
-`/pnl` separates actual paper execution from replay-estimated maker fills:
+`/pnl` separates actual paper execution from replay-estimated maker fills.
+On Azure, `source=auto` reads Azure Blob Storage for the current UTC day by
+default, so it survives container restarts and deployments.
 
 - `actual_paper` uses execution reports with positive `filled_size`.
 - `replay_estimate` replays post-only decisions against captured books and
   settlement prices.
+
+Useful query parameters:
+
+```text
+source=auto|azure|local
+prefix=events/YYYY/MM/DD/
+settlement_window_seconds=15
+```
 
 ## Quick Check
 

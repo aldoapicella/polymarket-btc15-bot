@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from .bot import PolymarketBtc15Bot
 from .config import Settings, load_settings
+from .pnl import build_pnl_report
 from .source_confirmation import confirm_source
 
 
@@ -64,6 +65,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/status", dependencies=[Depends(require_auth)])
     async def status() -> dict[str, object]:
         return bot.status()
+
+    @app.get("/pnl", dependencies=[Depends(require_auth)])
+    async def pnl(settlement_window_seconds: int = 15) -> dict[str, Any]:
+        return await asyncio.to_thread(
+            build_pnl_report,
+            config.recorder_path,
+            settlement_window_seconds,
+        )
 
     @app.post("/discover", dependencies=[Depends(require_auth)])
     async def discover() -> dict[str, Any]:

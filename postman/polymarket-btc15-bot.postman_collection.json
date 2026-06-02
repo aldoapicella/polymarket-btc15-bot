@@ -64,6 +64,23 @@
       }
     },
     {
+      "name": "PnL",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/pnl",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "pnl"
+          ]
+        },
+        "description": "Returns actual paper PnL from filled execution reports and replay-estimated maker PnL from captured decisions, books, and Chainlink settlement prices."
+      }
+    },
+    {
       "name": "Discover Markets",
       "request": {
         "method": "POST",

@@ -35,3 +35,22 @@ def test_api_requires_bearer_token_when_enabled(tmp_path) -> None:
     response = client.get("/health", headers={"Authorization": "Bearer secret-token"})
     assert response.status_code == 200
 
+
+def test_api_exposes_authenticated_pnl(tmp_path) -> None:
+    app = create_app(
+        Settings(
+            _env_file=None,
+            require_api_auth=True,
+            api_bearer_token="secret-token",
+            recorder_path=tmp_path / "events.jsonl",
+            kill_switch_file=tmp_path / "KILL_SWITCH",
+        )
+    )
+
+    response = TestClient(app).get(
+        "/pnl",
+        headers={"Authorization": "Bearer secret-token"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["summary"]["actual_paper_state"] == "flat"

@@ -54,6 +54,7 @@ Authorization: Bearer {{api_bearer_token}}
 ```text
 GET  /health
 GET  /status
+GET  /pnl
 POST /discover
 POST /confirm-source
 POST /evaluate?execute=false
@@ -64,6 +65,12 @@ GET  /openapi.json
 
 `/openapi.json` is FastAPI's generated schema route. The operational routes
 require the bearer token.
+
+`/pnl` separates actual paper execution from replay-estimated maker fills:
+
+- `actual_paper` uses execution reports with positive `filled_size`.
+- `replay_estimate` replays post-only decisions against captured books and
+  settlement prices.
 
 ## Quick Check
 

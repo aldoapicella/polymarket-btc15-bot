@@ -30,15 +30,24 @@ class OrderManager:
     def open_order_count(self) -> int:
         return len(self._quotes)
 
+    @property
+    def open_order_ids(self) -> set[str]:
+        return {
+            quote.order_id
+            for quote in self._quotes.values()
+            if quote.order_id is not None
+        }
+
     def reconcile(
         self,
         market_id: str,
         decisions: list[TradeDecision],
+        condition_id: str | None = None,
         now: datetime | None = None,
     ) -> list[TradeDecision]:
         current_time = now or utc_now()
         if any(decision.action == DecisionAction.CANCEL_ALL for decision in decisions):
-            return self._cancel_or_hold(market_id, decisions[0].reason)
+            return self._cancel_or_hold(market_id, decisions[0].reason, condition_id)
 
         place_decisions = [decision for decision in decisions if decision.action == DecisionAction.PLACE]
         taker_decisions = [
@@ -53,10 +62,10 @@ class OrderManager:
         if not maker_decisions:
             if self._market_quotes(market_id):
                 reason = decisions[0].reason if decisions else "no desired maker quote"
-                return [self._cancel_all_decision(market_id, reason), *taker_decisions]
+                return [self._cancel_all_decision(market_id, reason, condition_id), *taker_decisions]
             if taker_decisions:
                 return taker_decisions
-            return [self._hold_decision(market_id, decisions[0].reason if decisions else "no decision")]
+            return [self._hold_decision(market_id, decisions[0].reason if decisions else "no decision", condition_id)]
 
         desired_by_key = {
             key: decision
@@ -76,7 +85,7 @@ class OrderManager:
 
         actions: list[TradeDecision] = []
         if needs_cancel and current_quotes:
-            actions.append(self._cancel_all_decision(market_id, "cancel/replace maker quotes"))
+            actions.append(self._cancel_all_decision(market_id, "cancel/replace maker quotes", condition_id))
 
         if needs_cancel or not current_quotes:
             actions.extend(maker_decisions)
@@ -85,7 +94,7 @@ class OrderManager:
 
         if taker_decisions:
             return taker_decisions
-        return [self._hold_decision(market_id, "desired maker quotes already resting")]
+        return [self._hold_decision(market_id, "desired maker quotes already resting", condition_id)]
 
     def on_execution_report(self, decision: TradeDecision, report: ExecutionReport) -> None:
         if decision.action == DecisionAction.CANCEL_ALL:
@@ -116,10 +125,26 @@ class OrderManager:
             if key.market_id == market_id:
                 self._quotes.pop(key, None)
 
-    def _cancel_or_hold(self, market_id: str, reason: str) -> list[TradeDecision]:
+    def on_fill(self, report: ExecutionReport) -> None:
+        if report.order_id is not None:
+            for key, quote in list(self._quotes.items()):
+                if quote.order_id == report.order_id:
+                    self._quotes.pop(key, None)
+                    return
+        for key in list(self._quotes):
+            if key.market_id == report.market_id and key.token_id == report.token_id:
+                self._quotes.pop(key, None)
+                return
+
+    def _cancel_or_hold(
+        self,
+        market_id: str,
+        reason: str,
+        condition_id: str | None = None,
+    ) -> list[TradeDecision]:
         if self._market_quotes(market_id):
-            return [self._cancel_all_decision(market_id, reason)]
-        return [self._hold_decision(market_id, reason)]
+            return [self._cancel_all_decision(market_id, reason, condition_id)]
+        return [self._hold_decision(market_id, reason, condition_id)]
 
     def _market_quotes(self, market_id: str) -> list[ManagedQuote]:
         return [quote for quote in self._quotes.values() if quote.key.market_id == market_id]
@@ -149,17 +174,27 @@ class OrderManager:
         return quote.expires_at is not None and quote.expires_at <= now
 
     @staticmethod
-    def _cancel_all_decision(market_id: str, reason: str) -> TradeDecision:
+    def _cancel_all_decision(
+        market_id: str,
+        reason: str,
+        condition_id: str | None = None,
+    ) -> TradeDecision:
         return TradeDecision(
             action=DecisionAction.CANCEL_ALL,
             market_id=market_id,
+            condition_id=condition_id,
             reason=reason,
         )
 
     @staticmethod
-    def _hold_decision(market_id: str, reason: str) -> TradeDecision:
+    def _hold_decision(
+        market_id: str,
+        reason: str,
+        condition_id: str | None = None,
+    ) -> TradeDecision:
         return TradeDecision(
             action=DecisionAction.HOLD,
             market_id=market_id,
+            condition_id=condition_id,
             reason=reason,
         )

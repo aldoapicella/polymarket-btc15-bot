@@ -168,6 +168,22 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
               name: 'ENABLE_TAKER_ORDERS'
               value: 'false'
             }
+            {
+              name: 'PAPER_MAKER_FILL_POLICY'
+              value: 'touch_after_quote_was_live'
+            }
+            {
+              name: 'PAPER_ORDER_LIVE_AFTER_MS'
+              value: '250'
+            }
+            {
+              name: 'ALLOW_EMERGENCY_ACCOUNT_CANCEL'
+              value: 'false'
+            }
+            {
+              name: 'ENABLE_LIVE_HEARTBEAT'
+              value: 'true'
+            }
           ]
           resources: {
             cpu: json(cpu)
@@ -220,4 +236,3 @@ output containerAppFqdn string = containerApp.properties.configuration.ingress.f
 output storageAccountName string = storage.name
 output storageContainerName string = storageContainerName
 output storageTableName string = storageTableName
-

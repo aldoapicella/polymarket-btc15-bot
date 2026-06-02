@@ -57,6 +57,10 @@ GET  /status
 GET  /pnl?source=azure
 GET  /pnl?source=azure&prefix={{pnl_prefix}}
 GET  /pnl?source=local
+POST /reports/build
+GET  /reports/{job_id}
+GET  /reports/latest
+GET  /reports/daily/{date}
 POST /discover
 POST /confirm-source
 POST /evaluate?execute=false
@@ -68,13 +72,18 @@ GET  /openapi.json
 `/openapi.json` is FastAPI's generated schema route. The operational routes
 require the bearer token.
 
-`/pnl` separates actual paper execution from replay-estimated maker fills.
-Use the Azure-backed requests for real reporting because local container files
-reset across deployments.
+`/pnl` separates runtime paper execution from offline replay-estimated maker
+fills. Use the Azure-backed requests for real reporting because local container
+files reset across deployments.
 
-- `actual_paper` uses execution reports with positive `filled_size`.
+- `actual_paper` uses execution reports with positive `filled_size`. With the
+  default runtime paper fill engine, optimistic maker touches are recorded as
+  `paper_filled_maker` reports.
+- `actual_paper.runtime_fill_policy` shows the runtime policy currently used by
+  the bot.
 - `replay_estimate` replays post-only decisions against captured books and
   settlement prices.
+- `replay_estimate.replay_fill_policy` shows the offline replay policy.
 - `replay_estimate.replay_metrics` includes cancellation-aware metrics such as
   `cancel_decisions_seen`, `cancel_execution_reports_seen`,
   `orders_cancelled`, `open_orders_remaining`, and
@@ -88,6 +97,15 @@ prefix=events/YYYY/MM/DD/HH/
 settlement_window_seconds=15
 ```
 
+Useful environment variables:
+
+```text
+pnl_prefix=events/YYYY/MM/DD/HH/
+report_date=YYYY-MM-DD
+report_job_id=<set automatically by report build requests>
+settlement_window_seconds=15
+```
+
 For interactive checks, prefer a short prefix:
 
 ```text
@@ -96,6 +114,49 @@ events/2026/06/02/17/
 
 The full current-day Azure replay can be slow because it downloads and replays
 all captured book events for the day.
+
+## Cached Reports
+
+Use cached reports instead of large synchronous `/pnl` calls:
+
+```text
+POST /reports/build
+GET  /reports/{job_id}
+GET  /reports/latest
+GET  /reports/daily/2026-06-02
+```
+
+Build a current UTC day Azure report:
+
+```json
+{
+  "source": "azure",
+  "settlement_window_seconds": 15
+}
+```
+
+Build a specific day:
+
+```json
+{
+  "source": "azure",
+  "date": "2026-06-02",
+  "settlement_window_seconds": 15
+}
+```
+
+Build a short prefix:
+
+```json
+{
+  "source": "azure",
+  "prefix": "events/2026/06/02/17/",
+  "settlement_window_seconds": 15
+}
+```
+
+Only one report job can run at a time. If another job is active, the API
+returns `409` with the running job metadata.
 
 ## Quick Check
 

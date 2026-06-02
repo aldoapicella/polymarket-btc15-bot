@@ -60,7 +60,7 @@
             "status"
           ]
         },
-        "description": "Returns current bot state, latest reference, market/book counts, tracked open orders, latest decisions, and latest execution reports."
+        "description": "Returns current bot state, latest reference, market/book counts, runtime paper-fill counters, heartbeat state, report-job state, latest decisions, and latest execution reports."
       }
     },
     {
@@ -87,7 +87,7 @@
             }
           ]
         },
-        "description": "Runs Azure Blob-backed PnL replay for the current UTC day. This can be slow because it replays captured book events. The replay estimate is cancellation-aware and excludes orders after cancel_all or cancellation execution reports."
+        "description": "Runs Azure Blob-backed PnL replay for the current UTC day. This can be slow because it replays captured book events. Prefer POST /reports/build for large prefixes. The response separates runtime paper execution from cancellation-aware offline replay."
       },
       "event": [
         {
@@ -146,7 +146,7 @@
             }
           ]
         },
-        "description": "Runs a targeted Azure Blob-backed PnL replay for the configured prefix. Use short prefixes such as events/YYYY/MM/DD/HH/ for interactive checks. This is the recommended request for investigating a specific hour."
+        "description": "Runs a targeted Azure Blob-backed PnL replay for the configured prefix. Use short prefixes such as events/YYYY/MM/DD/HH/ for interactive checks. Prefer POST /reports/build for larger prefixes."
       },
       "event": [
         {
@@ -201,6 +201,196 @@
         },
         "description": "Reads only the current container revision's local data/events.jsonl file. On Azure this resets across deployments, so use Azure-backed PnL for historical reporting."
       }
+    },
+    {
+      "name": "Reports - Build Current UTC Day",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"source\": \"azure\",\n  \"settlement_window_seconds\": 15\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/reports/build",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "reports",
+            "build"
+          ]
+        },
+        "description": "Starts one cached Azure report job for the current UTC day. The API allows only one active report job; a 409 response means another job is still running."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Build report returns 200 or 409', function () {",
+              "  pm.expect([200, 409]).to.include(pm.response.code);",
+              "});",
+              "const body = pm.response.json();",
+              "if (pm.response.code === 200 && body.job_id) {",
+              "  pm.environment.set('report_job_id', body.job_id);",
+              "  console.log('report_job_id:', body.job_id);",
+              "} else if (pm.response.code === 409 && body.detail && body.detail.running_job) {",
+              "  pm.environment.set('report_job_id', body.detail.running_job.job_id);",
+              "  console.log('running report_job_id:', body.detail.running_job.job_id);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reports - Build Prefix",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"source\": \"azure\",\n  \"prefix\": \"{{pnl_prefix}}\",\n  \"settlement_window_seconds\": 15\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/reports/build",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "reports",
+            "build"
+          ]
+        },
+        "description": "Starts one cached report job for the configured Azure event prefix. Use this for hourly investigations."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Build prefix report returns 200 or 409', function () {",
+              "  pm.expect([200, 409]).to.include(pm.response.code);",
+              "});",
+              "const body = pm.response.json();",
+              "if (pm.response.code === 200 && body.job_id) { pm.environment.set('report_job_id', body.job_id); }",
+              "if (pm.response.code === 409 && body.detail && body.detail.running_job) { pm.environment.set('report_job_id', body.detail.running_job.job_id); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reports - Get Job",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/reports/{{report_job_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "reports",
+            "{{report_job_id}}"
+          ]
+        },
+        "description": "Returns report job metadata while running and the persisted report payload after completion."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Report job response is OK', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "const job = body.job || body;",
+              "pm.test('Job has status', function () { pm.expect(job).to.have.property('status'); });",
+              "console.log('report job status:', job.status);",
+              "if (body.report) { console.log('summary:', body.report.summary); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reports - Latest",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/reports/latest",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "reports",
+            "latest"
+          ]
+        },
+        "description": "Returns the most recent cached report. Use this instead of rerunning a large /pnl replay."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Latest report is available', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('Latest report contains summary', function () { pm.expect(body.report).to.have.property('summary'); });",
+              "console.log('latest summary:', body.report.summary);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reports - Daily",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/reports/daily/{{report_date}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "reports",
+            "daily",
+            "{{report_date}}"
+          ]
+        },
+        "description": "Returns the cached report for report_date. Build it first with POST /reports/build using the same date."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Daily report is available', function () { pm.response.to.have.status(200); });",
+              "const body = pm.response.json();",
+              "pm.test('Daily report contains summary', function () { pm.expect(body.report).to.have.property('summary'); });",
+              "console.log('daily summary:', body.report.summary);"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "Discover Markets",

@@ -78,6 +78,12 @@ class Settings(BaseSettings):
     max_book_age_ms: int = 1500
     final_no_trade_seconds: int = 30
     order_ttl_seconds: int = 10
+    paper_maker_fill_policy: Literal["none", "touch_after_quote_was_live"] = "touch_after_quote_was_live"
+    paper_order_live_after_ms: int = 250
+    allow_emergency_account_cancel: bool = False
+    enable_live_heartbeat: bool = True
+    live_heartbeat_interval_seconds: float = 5.0
+    live_heartbeat_failure_threshold: int = 2
 
     kill_switch_file: Path = Path("data/KILL_SWITCH")
     recorder_path: Path = Path("data/events.jsonl")

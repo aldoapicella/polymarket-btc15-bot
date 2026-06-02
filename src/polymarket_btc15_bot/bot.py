@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 from .config import Settings
-from .execution import ExecutionClient, build_execution_client
+from .execution import ExecutionClient, LiveClobExecutionClient, PaperExecutionClient, build_execution_client
 from .fair_value import LogReturnFairValueModel
 from .market_discovery import MarketDiscovery
 from .models import (
@@ -20,6 +20,7 @@ from .models import (
     utc_now,
 )
 from .order_manager import OrderManager
+from .paper_fill import PaperFillEngine
 from .polymarket_feed import PolymarketMarketFeed
 from .polymarket_rtds import PolymarketRtdsFeed, binance_subscription, chainlink_subscription
 from .recorder import JsonlRecorder, Recorder, build_recorder
@@ -53,6 +54,7 @@ class PolymarketBtc15Bot:
         self.risk = RiskManager(settings)
         self.order_manager = OrderManager()
         self.execution = execution_client or build_execution_client(settings)
+        self.paper_fill_engine = PaperFillEngine(settings)
         self.recorder = recorder or build_recorder(settings)
 
         self.markets: dict[str, MarketSpec] = {}
@@ -63,6 +65,8 @@ class PolymarketBtc15Bot:
         self.execution_reports: list[ExecutionReport] = []
         self.started_at: datetime = utc_now()
         self._last_volatility_update_key: tuple[str, datetime, Decimal] | None = None
+        self._settled_markets: set[str] = set()
+        self._live_heartbeat_paused = False
         self._tasks: list[asyncio.Task[None]] = []
         self._stop_event = asyncio.Event()
 
@@ -92,10 +96,24 @@ class PolymarketBtc15Bot:
             self.fair_values[market.market_id] = fair_value
             self.recorder.record("fair_value", fair_value)
 
-            raw_decisions = self.strategy.evaluate(market, fair_value, self.books)
+            if self._live_heartbeat_paused:
+                raw_decisions = [
+                    TradeDecision(
+                        action=DecisionAction.CANCEL_ALL,
+                        market_id=market.market_id,
+                        condition_id=market.condition_id,
+                        reason="live heartbeat failure paused placements",
+                    )
+                ]
+            else:
+                raw_decisions = self.strategy.evaluate(market, fair_value, self.books)
             assessment = self.risk.assess_market(market, self.reference, self.books)
             risk_decisions = self.risk.filter_decisions(raw_decisions, market, assessment)
-            decisions = self.order_manager.reconcile(market.market_id, risk_decisions)
+            decisions = self.order_manager.reconcile(
+                market.market_id,
+                risk_decisions,
+                condition_id=market.condition_id,
+            )
             for decision in decisions:
                 self.decisions.append(decision)
                 emitted.append(decision)
@@ -117,6 +135,12 @@ class PolymarketBtc15Bot:
             asyncio.create_task(self._market_feed_loop(), name="polymarket-feed"),
             asyncio.create_task(self._strategy_loop(), name="strategy"),
         ]
+        if (
+            self.settings.live_requested
+            and self.settings.enable_live_heartbeat
+            and isinstance(self.execution, LiveClobExecutionClient)
+        ):
+            self._tasks.append(asyncio.create_task(self._heartbeat_loop(), name="live-heartbeat"))
         if self.settings.enable_polymarket_rtds_chainlink:
             self._tasks.append(
                 asyncio.create_task(
@@ -172,6 +196,17 @@ class PolymarketBtc15Bot:
             "tradeable_markets": len(self._active_markets()),
             "books": len(self.books),
             "tracked_open_orders": self.order_manager.open_order_count,
+            "paper_fill": (
+                self.paper_fill_engine.status(self.execution)
+                if isinstance(self.execution, PaperExecutionClient)
+                else None
+            ),
+            "live_heartbeat_paused": self._live_heartbeat_paused,
+            "live_heartbeat": (
+                self.execution.heartbeat_status()
+                if isinstance(self.execution, LiveClobExecutionClient)
+                else None
+            ),
             "recorder": self.recorder.status() if hasattr(self.recorder, "status") else None,
             "reference": self.reference.model_dump(mode="json") if self.reference else None,
             "latest_decisions": [item.model_dump(mode="json") for item in self.decisions[-20:]],
@@ -201,6 +236,7 @@ class PolymarketBtc15Bot:
                     composite = self.reference_aggregator.update(reference)
                     self.reference = composite
                     self._capture_market_start_prices(reference)
+                    self._settle_finished_markets(reference)
                     self._maybe_update_volatility(composite)
                     self.recorder.record("reference", composite)
                     if self._stop_event.is_set():
@@ -221,6 +257,7 @@ class PolymarketBtc15Bot:
                 if reference is not None:
                     self.reference = self.reference_aggregator.update(reference)
                     self._capture_market_start_prices(self.reference)
+                    self._settle_finished_markets(self.reference)
                     self._maybe_update_volatility(self.reference)
                     self.recorder.record("reference", self.reference)
             await asyncio.sleep(1.0)
@@ -240,6 +277,7 @@ class PolymarketBtc15Bot:
             async for book in self.market_feed.stream(token_ids):
                 self.books[book.token_id] = book
                 self.recorder.record("book", book)
+                self._handle_paper_fills(book)
                 if self._stop_event.is_set():
                     break
 
@@ -257,6 +295,19 @@ class PolymarketBtc15Bot:
             with suppress(Exception):
                 await self.evaluate_once(execute=True)
             await asyncio.sleep(1.0)
+
+    async def _heartbeat_loop(self) -> None:
+        assert isinstance(self.execution, LiveClobExecutionClient)
+        while not self._stop_event.is_set():
+            status = await self.execution.heartbeat_once()
+            self.recorder.record("live_heartbeat", status)
+            if status.get("ok"):
+                self._live_heartbeat_paused = False
+            else:
+                if self.execution.heartbeat_failure_count >= self.settings.live_heartbeat_failure_threshold:
+                    self._live_heartbeat_paused = True
+                    await self._cancel_active_markets("live heartbeat failure")
+            await asyncio.sleep(self.settings.live_heartbeat_interval_seconds)
 
     def _capture_market_start_prices(self, reference: ReferencePrice) -> None:
         if reference.stale or not reference.exact_resolution_source:
@@ -280,3 +331,75 @@ class PolymarketBtc15Bot:
                         "reference_source_ts": reference.source_ts.isoformat(),
                     },
                 )
+
+    def _handle_paper_fills(self, book: BookState) -> None:
+        if not isinstance(self.execution, PaperExecutionClient):
+            return
+        markets_by_token = self._markets_by_token()
+        reports = self.paper_fill_engine.on_book(
+            book=book,
+            markets_by_token=markets_by_token,
+            execution=self.execution,
+            tracked_order_ids=self.order_manager.open_order_ids,
+        )
+        for report in reports:
+            self.execution_reports.append(report)
+            self.order_manager.on_fill(report)
+            self.risk.open_order_count = self.order_manager.open_order_count
+            self.risk.on_execution_report(report)
+            self.recorder.record("execution_report", report)
+
+    def _settle_finished_markets(self, reference: ReferencePrice) -> None:
+        if reference.stale or not reference.exact_resolution_source:
+            return
+        for market_id, market in list(self.markets.items()):
+            if market_id in self._settled_markets:
+                continue
+            if market.start_price is None:
+                continue
+            if reference.source_ts < market.end_ts:
+                continue
+            winning_outcome = "up" if reference.price >= market.start_price else "down"
+            cleared_position = self.risk.clear_market(market_id)
+            self.order_manager.clear_market(market_id)
+            if isinstance(self.execution, PaperExecutionClient):
+                self.execution.clear_market(market_id)
+            self._settled_markets.add(market_id)
+            self.recorder.record(
+                "paper_settlement",
+                {
+                    "market_id": market_id,
+                    "market_slug": market.market_slug,
+                    "start_ts": market.start_ts.isoformat(),
+                    "end_ts": market.end_ts.isoformat(),
+                    "start_price": str(market.start_price),
+                    "final_price": str(reference.price),
+                    "winning_outcome": winning_outcome,
+                    "reference_source": reference.source,
+                    "reference_source_ts": reference.source_ts.isoformat(),
+                    "cleared_position": str(cleared_position),
+                },
+            )
+
+    async def _cancel_active_markets(self, reason: str) -> None:
+        for market in self._active_markets():
+            decision = TradeDecision(
+                action=DecisionAction.CANCEL_ALL,
+                market_id=market.market_id,
+                condition_id=market.condition_id,
+                reason=reason,
+            )
+            self.decisions.append(decision)
+            self.recorder.record("decision", decision)
+            report = await self.execution.submit(decision)
+            self.execution_reports.append(report)
+            self.order_manager.on_execution_report(decision, report)
+            self.risk.open_order_count = self.order_manager.open_order_count
+            self.recorder.record("execution_report", report)
+
+    def _markets_by_token(self) -> dict[str, MarketSpec]:
+        markets_by_token: dict[str, MarketSpec] = {}
+        for market in self.markets.values():
+            markets_by_token[market.up_token_id] = market
+            markets_by_token[market.down_token_id] = market
+        return markets_by_token

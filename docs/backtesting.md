@@ -39,6 +39,23 @@ The replay does not yet model exact queue priority, trade prints, partial maker
 fills, or cancellation latency. Add those after enough CLOB book/trade data is
 recorded.
 
+## Runtime Paper vs Replay
+
+The API PnL report intentionally separates two ledgers:
+
+- `actual_paper` is the runtime paper ledger from `execution_report` events
+  with positive `filled_size`. Maker fills appear here only when the runtime
+  `PaperFillEngine` emits `paper_filled_maker`.
+- `replay_estimate` is the offline replay ledger. It replays recorded
+  decisions against captured books and removes open replay orders on
+  `cancel_all` decisions or cancellation execution reports.
+
+The default runtime maker fill policy is `touch_after_quote_was_live`. It is
+optimistic: a resting post-only buy is marked filled when the captured best ask
+touches or crosses the quote after the configured live delay, provided the
+book is fresh, the market is active, the order TTL has not expired, and the bot
+is not inside the final no-trade window.
+
 Live CLOB FAK/FOK BUY orders use quote-dollar `amount = price * size`, but the
 recorded decision and replay engine keep `size` as share quantity. The optional
 `quote_amount` field is recorded to audit that live conversion.

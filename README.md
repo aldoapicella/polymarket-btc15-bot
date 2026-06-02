@@ -48,12 +48,22 @@ Replay collected events:
 polymarket-btc15-bot backtest --path data/events.jsonl
 ```
 
-Replay assumptions are documented in [docs/backtesting.md](docs/backtesting.md).
+Replay assumptions and the difference between runtime paper fills and offline
+replay estimates are documented in [docs/backtesting.md](docs/backtesting.md).
+The default runtime paper maker-fill policy is `touch_after_quote_was_live`.
 
 Azure deployment, authentication, and event-query instructions are documented
 in [docs/azure-deployment.md](docs/azure-deployment.md).
 Postman import and token setup instructions are documented in
 [docs/postman.md](docs/postman.md).
+
+For large Azure replays, prefer cached reports:
+
+```text
+POST /reports/build
+GET  /reports/latest
+GET  /reports/daily/YYYY-MM-DD
+```
 
 Confirm the Polymarket/Chainlink BTC 15m source:
 

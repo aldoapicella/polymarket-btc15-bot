@@ -94,6 +94,7 @@ class RiskManager:
                 TradeDecision(
                     action=DecisionAction.CANCEL_ALL,
                     market_id=market.market_id,
+                    condition_id=market.condition_id,
                     reason="; ".join(assessment.reasons),
                 )
             ]
@@ -121,6 +122,7 @@ class RiskManager:
             TradeDecision(
                 action=DecisionAction.HOLD,
                 market_id=market.market_id,
+                condition_id=market.condition_id,
                 reason="all decisions rejected by risk limits",
             )
         ]
@@ -130,3 +132,8 @@ class RiskManager:
             return
         self.positions_by_market[report.market_id] += report.filled_size
         self.total_position += report.filled_size
+
+    def clear_market(self, market_id: str) -> Decimal:
+        cleared = self.positions_by_market.pop(market_id, Decimal("0"))
+        self.total_position = max(Decimal("0"), self.total_position - cleared)
+        return cleared

@@ -136,6 +136,7 @@ class FairValue(BaseModel):
 class TradeDecision(BaseModel):
     action: DecisionAction
     market_id: str
+    condition_id: str | None = None
     token_id: str | None = None
     outcome: Outcome | None = None
     side: Side | None = None

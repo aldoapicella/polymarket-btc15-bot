@@ -349,9 +349,17 @@ no maker edge while quote is resting -> cancel all market quotes
 stale feed, kill switch, close window, or risk breach -> cancel all market quotes
 ```
 
-The current execution adapter exposes market-level `cancel_all`, so
-cancel/replace is deliberately conservative and clears the market's tracked
-quotes before placing replacements.
+In paper mode, `cancel_all` cancels the bot's tracked resting paper orders for
+that market. In live mode, cancel/replace is scoped:
+
+```text
+tracked live order ids -> cancelOrders([...])
+no tracked ids but condition_id available -> cancelMarketOrders({ market: condition_id })
+no scope available -> reject cancellation unless ALLOW_EMERGENCY_ACCOUNT_CANCEL=true
+```
+
+Account-wide live cancellation is reserved for an explicit emergency gate and
+should only be used with a dedicated wallet.
 
 ## Taker Strategy
 

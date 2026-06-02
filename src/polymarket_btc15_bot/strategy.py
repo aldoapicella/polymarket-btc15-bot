@@ -53,6 +53,7 @@ class MakerFirstStrategy:
             TradeDecision(
                 action=DecisionAction.HOLD,
                 market_id=market.market_id,
+                condition_id=market.condition_id,
                 reason="no maker or taker edge after fees and buffers",
             )
         ]
@@ -104,6 +105,7 @@ class MakerFirstStrategy:
                 TradeDecision(
                     action=DecisionAction.PLACE,
                     market_id=market.market_id,
+                    condition_id=market.condition_id,
                     token_id=token_id,
                     outcome=outcome,
                     side=Side.BUY,
@@ -133,6 +135,7 @@ class MakerFirstStrategy:
                     TradeDecision(
                         action=DecisionAction.PLACE,
                         market_id=market.market_id,
+                        condition_id=market.condition_id,
                         token_id=token_id,
                         outcome=outcome,
                         side=Side.BUY,

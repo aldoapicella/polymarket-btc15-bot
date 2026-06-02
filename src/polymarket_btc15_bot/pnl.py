@@ -14,6 +14,7 @@ from .config import Settings
 def build_pnl_report(
     path: Path,
     settlement_window_seconds: int = 15,
+    runtime_fill_policy: str = "unknown",
 ) -> dict[str, Any]:
     return _build_pnl_report_from_events(
         events=_iter_jsonl(path),
@@ -22,6 +23,7 @@ def build_pnl_report(
             "path": str(path),
         },
         settlement_window_seconds=settlement_window_seconds,
+        runtime_fill_policy=runtime_fill_policy,
     )
 
 
@@ -29,6 +31,7 @@ def build_azure_pnl_report(
     settings: Settings,
     prefix: str | None = None,
     settlement_window_seconds: int = 15,
+    runtime_fill_policy: str | None = None,
 ) -> dict[str, Any]:
     if not settings.azure_storage_account_name:
         raise ValueError("azure_storage_account_name is not configured")
@@ -45,6 +48,7 @@ def build_azure_pnl_report(
             "blob_count": len(blob_names),
         },
         settlement_window_seconds=settlement_window_seconds,
+        runtime_fill_policy=runtime_fill_policy or settings.paper_maker_fill_policy,
     )
 
 
@@ -52,6 +56,7 @@ def _build_pnl_report_from_events(
     events: Iterable[dict[str, Any]],
     source: dict[str, Any],
     settlement_window_seconds: int,
+    runtime_fill_policy: str,
 ) -> dict[str, Any]:
     actual_accumulator = _ActualPaperAccumulator()
     backtester = ReplayBacktester(
@@ -76,8 +81,20 @@ def _build_pnl_report_from_events(
             "replay_estimate_net_pnl": str(replay_net),
             "replay_estimate_roi_on_cost": _ratio(replay_net, replay_cost),
         },
-        "actual_paper": actual,
+        "actual_paper": {
+            "meaning": (
+                "Runtime paper ledger built only from execution_report events with positive filled_size. "
+                "Maker fills appear here only when the runtime paper fill engine emits paper_filled_maker."
+            ),
+            "runtime_fill_policy": runtime_fill_policy,
+            **actual,
+        },
         "replay_estimate": {
+            "meaning": (
+                "Offline cancellation-aware replay over recorded market, decision, book, and Chainlink "
+                "reference events."
+            ),
+            "replay_fill_policy": "touch_after_cancel_aware",
             "assumption": (
                 "Post-only maker orders are treated as filled when the captured "
                 "best ask touches or crosses the quote while the replay order is open. "

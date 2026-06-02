@@ -18,6 +18,10 @@ EXECUTION_MODE=paper
 ALLOW_LIVE=false
 RUN_BOT_ON_STARTUP=true
 ENABLE_TAKER_ORDERS=false
+PAPER_MAKER_FILL_POLICY=touch_after_quote_was_live
+PAPER_ORDER_LIVE_AFTER_MS=250
+ALLOW_EMERGENCY_ACCOUNT_CANCEL=false
+ENABLE_LIVE_HEARTBEAT=true
 ```
 
 ## Resources
@@ -108,6 +112,20 @@ Every recorded event is written to minute-segmented append blobs:
 bot-events/events/YYYY/MM/DD/HH/mm.jsonl
 ```
 
+Cached PnL reports are written to:
+
+```text
+bot-events/reports/jobs/<job_id>.json
+bot-events/reports/jobs/<job_id>.md
+bot-events/reports/latest.json
+bot-events/reports/YYYY/MM/DD/report.json
+bot-events/reports/YYYY/MM/DD/report.md
+```
+
+Use `POST /reports/build` to create a report job, then read it with
+`GET /reports/{job_id}`, `GET /reports/latest`, or
+`GET /reports/daily/YYYY-MM-DD`.
+
 Azure writes are queued and batched in a background recorder thread. The bot
 hot path records local JSONL immediately, then enqueues cloud writes so Azure
 latency does not block feed processing. Batching also keeps append operations
@@ -189,6 +207,19 @@ extra query convenience is worth the write volume.
 
 This minute segmentation prevents a single high-volume hourly blob from
 reaching Azure Append Blob's committed block limit during soak tests.
+
+## Live-Safety Defaults
+
+Azure is intentionally deployed in paper mode. The live adapter is still coded
+for safer future use:
+
+- cancel decisions prefer tracked order IDs;
+- if no tracked order IDs are available, cancellation falls back to
+  `condition_id` / market-scoped cancel;
+- account-wide `cancel_all` is blocked unless
+  `ALLOW_EMERGENCY_ACCOUNT_CANCEL=true`;
+- heartbeat is live-only and records `live_heartbeat` events when live mode is
+  explicitly enabled.
 
 ## Query Examples
 

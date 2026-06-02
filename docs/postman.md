@@ -172,7 +172,9 @@ runtime_vs_replay.runtime_minus_replay_pnl
 ```
 
 For `force=false`, completed non-current-day daily reports are reused. Use
-`force=true` to rebuild and overwrite a cached past daily report.
+`force=true` to rebuild and overwrite a cached past daily report. Hourly prefix
+reports update `/reports/latest` and their job blob, but they do not overwrite
+`/reports/daily/{date}`.
 
 ## Quick Check
 

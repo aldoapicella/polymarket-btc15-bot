@@ -173,7 +173,7 @@ class ReportJobManager:
             return
         await asyncio.to_thread(self.store.write_text, job["markdown_blob"], _report_markdown(report))
         day = _day_from_prefix(job.get("prefix")) or _date_from_string(job.get("date"))
-        if day is not None:
+        if day is not None and job.get("writes_daily_report"):
             daily_json = f"reports/{day:%Y/%m/%d}/report.json"
             daily_md = f"reports/{day:%Y/%m/%d}/report.md"
             job["daily_report_blob"] = daily_json
@@ -196,6 +196,7 @@ class ReportJobManager:
         now = datetime.now(timezone.utc)
         prefix_start_ts, prefix_end_ts = _prefix_window(prefix)
         report_day = request.report_date or _day_from_prefix(prefix)
+        writes_daily_report = request.report_date is not None or _is_day_prefix(prefix)
         return {
             "job_id": job_id,
             "status": "queued",
@@ -203,6 +204,7 @@ class ReportJobManager:
             "prefix": prefix,
             "date": request.report_date.isoformat() if request.report_date else None,
             "partial_day": _partial_day(report_day, now),
+            "writes_daily_report": writes_daily_report,
             "as_of_ts": now.isoformat(),
             "prefix_start_ts": prefix_start_ts.isoformat() if prefix_start_ts else None,
             "prefix_end_ts": prefix_end_ts.isoformat() if prefix_end_ts else None,
@@ -329,6 +331,13 @@ def _day_from_prefix(prefix: str | None) -> date | None:
         return date(int(parts[1]), int(parts[2]), int(parts[3]))
     except ValueError:
         return None
+
+
+def _is_day_prefix(prefix: str | None) -> bool:
+    if not prefix:
+        return False
+    parts = prefix.strip("/").split("/")
+    return len(parts) == 4 and parts[0] == "events"
 
 
 def _date_from_string(value: Any) -> date | None:

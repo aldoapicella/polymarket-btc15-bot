@@ -128,7 +128,9 @@ Use `POST /reports/build` to create a report job, then read it with
 
 Report jobs include `partial_day`, `as_of_ts`, `prefix_start_ts`, and
 `prefix_end_ts`. Completed past-day reports are reused when `force=false`;
-set `force=true` to rebuild an existing cached daily report.
+set `force=true` to rebuild an existing cached daily report. Hourly prefix
+reports update `reports/latest.json` and their job blobs, but only day-level or
+date-based builds write `reports/YYYY/MM/DD/report.json`.
 
 Azure writes are queued and batched in a background recorder thread. The bot
 hot path records local JSONL immediately, then enqueues cloud writes so Azure

@@ -88,3 +88,27 @@ async def test_report_job_manager_force_rebuilds_completed_past_daily_report(tmp
     )
 
     assert job["job_id"] != "existing-job"
+
+
+def test_report_job_daily_write_flag_only_for_day_level_reports(tmp_path) -> None:
+    settings = Settings(
+        _env_file=None,
+        recorder_path=tmp_path / "events.jsonl",
+        kill_switch_file=tmp_path / "KILL_SWITCH",
+    )
+    manager = ReportJobManager(settings)
+    report_date = datetime.now(timezone.utc).date()
+
+    day_job = manager._new_job(
+        ReportBuildRequest(source="azure", prefix="events/2026/06/02/")
+    )
+    hour_job = manager._new_job(
+        ReportBuildRequest(source="azure", prefix="events/2026/06/02/20/")
+    )
+    date_job = manager._new_job(
+        ReportBuildRequest(source="azure", report_date=report_date)
+    )
+
+    assert day_job["writes_daily_report"] is True
+    assert hour_job["writes_daily_report"] is False
+    assert date_job["writes_daily_report"] is True

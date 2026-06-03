@@ -49,6 +49,20 @@ jobs:
             --name "$AZURE_RESOURCE_GROUP" \
             --location "$AZURE_LOCATION"
 
+      - name: Resolve current app image
+        id: current_image
+        run: |
+          container_app_name="$APP_NAME-dev"
+          image=$(az containerapp show \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$container_app_name" \
+            --query 'properties.template.containers[0].image' \
+            -o tsv 2>/dev/null || true)
+          if [ -z "$image" ]; then
+            image="mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
+          fi
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+
       - name: Deploy infrastructure
         run: |
           az deployment group create \
@@ -56,7 +70,7 @@ jobs:
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --template-file infra/main.bicep \
             --parameters infra/parameters/dev.bicepparam \
-            --parameters appName="$APP_NAME" apiBearerToken="${{ secrets.API_BEARER_TOKEN }}"
+            --parameters appName="$APP_NAME" image="${{ steps.current_image.outputs.image }}" apiBearerToken="${{ secrets.API_BEARER_TOKEN }}"
 
       - name: Read deployment outputs
         id: deploy_outputs

@@ -20,10 +20,10 @@ param minReplicas int = 1
 param maxReplicas int = 1
 
 @description('Container CPU allocation.')
-param cpu string = '0.25'
+param cpu string = '0.5'
 
 @description('Container memory allocation.')
-param memory string = '0.5Gi'
+param memory string = '1Gi'
 
 @description('Deployment environment tag.')
 param environmentName string = 'dev'
@@ -123,6 +123,12 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
         {
           name: 'api-bearer-token'
           value: apiBearerToken
+        }
+      ]
+      registries: [
+        {
+          server: acr.properties.loginServer
+          identity: 'system'
         }
       ]
     }

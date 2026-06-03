@@ -44,6 +44,7 @@ Table: BotEventIndex
 ACR: cr<derived>
 Container Apps environment: polymarket-btc15-dev-env
 Container App: polymarket-btc15-dev
+Container App size: 1 replica, 0.5 CPU, 1Gi memory
 GitHub deployment identity: id-github-polymarket-btc15-dev
 ```
 

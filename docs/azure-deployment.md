@@ -3,13 +3,15 @@
 This deployment keeps cost low while preserving continuous paper-mode data
 capture:
 
-- Azure Container Apps: one always-on replica running the bot/API container.
+- Azure Container Apps: one always-on replica running the bot/API container and
+  the Next.js control-plane frontend sidecar.
 - Azure Container Registry Basic: private image registry for GitHub Actions.
 - Azure Storage Standard LRS: append blobs for raw replay data plus Azure Table
   Storage for event queries.
 - GitHub Actions OIDC through a user-assigned managed identity: no long-lived
   Azure password in GitHub.
-- API bearer token: required for all public API endpoints.
+- API bearer token: required for all backend API endpoints. The frontend reads
+  it only from server-side environment variables and proxies backend calls.
 
 The bot remains paper-only in Azure:
 
@@ -44,9 +46,14 @@ Table: BotEventIndex
 ACR: cr<derived>
 Container Apps environment: polymarket-btc15-dev-env
 Container App: polymarket-btc15-dev
-Container App size: 1 replica, 0.5 CPU, 1Gi memory
+Container App size: 1 replica, backend 0.5 CPU/1Gi, frontend 0.5 CPU/1Gi
 GitHub deployment identity: id-github-polymarket-btc15-dev
 ```
+
+These Azure resource names intentionally retain the original
+`polymarket-btc15` prefix for the current deployment. A later resource-name
+migration to `polyedge` should create a parallel Container App stack, validate
+OIDC/federated credentials, cut traffic over, and then retire the old stack.
 
 Storage public access is disabled. The container app uses its managed identity
 with these scoped data roles:
@@ -97,13 +104,14 @@ credentials.
 
 `API_BEARER_TOKEN` is saved locally in `data/api-bearer-token.txt`, stored as a
 GitHub secret, and saved as a Container App secret. It is required by the
-FastAPI app:
+FastAPI app through the frontend proxy:
 
 ```bash
-curl -H "Authorization: Bearer <token>" https://<container-app-fqdn>/health
+curl https://<container-app-fqdn>/api/backend/health
 ```
 
-Requests without the bearer token receive `401`.
+Direct backend requests without the bearer token receive `401`; public browser
+traffic reaches the backend through the Next.js server proxy.
 
 ## Data Layout
 

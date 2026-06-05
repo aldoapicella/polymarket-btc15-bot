@@ -6,8 +6,11 @@ param location string = resourceGroup().location
 @description('Short app name used for resource names.')
 param appName string = 'polymarket-btc15'
 
-@description('Container image to run. The workflow deploys a placeholder first, then updates to the built image.')
+@description('Backend container image to run. The workflow deploys the current image first, then updates to the built image.')
 param image string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+
+@description('Frontend container image. Leave empty for backend-only bootstrap deployments.')
+param frontendImage string = ''
 
 @description('Bearer token required to access the public API.')
 @secure()
@@ -25,6 +28,12 @@ param cpu string = '0.5'
 @description('Container memory allocation.')
 param memory string = '1Gi'
 
+@description('Frontend container CPU allocation.')
+param frontendCpu string = '0.5'
+
+@description('Frontend container memory allocation.')
+param frontendMemory string = '1Gi'
+
 @description('Deployment environment tag.')
 param environmentName string = 'dev'
 
@@ -36,6 +45,7 @@ var managedEnvironmentName = '${appName}-${environmentName}-env'
 var containerAppName = '${appName}-${environmentName}'
 var storageContainerName = 'bot-events'
 var storageTableName = 'BotEventIndex'
+var frontendEnabled = !empty(frontendImage)
 var tags = {
   app: appName
   environment: environmentName
@@ -115,7 +125,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
       activeRevisionsMode: 'Single'
       ingress: {
         external: true
-        targetPort: 8000
+        targetPort: frontendEnabled ? 3000 : 8000
         transport: 'http'
         allowInsecure: false
       }
@@ -133,11 +143,15 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
       ]
     }
     template: {
-      containers: [
+      containers: concat([
         {
           name: 'bot'
           image: image
           env: [
+            {
+              name: 'APP_NAME'
+              value: 'polyedge'
+            }
             {
               name: 'EXECUTION_MODE'
               value: 'paper'
@@ -157,6 +171,30 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'API_BEARER_TOKEN'
               secretRef: 'api-bearer-token'
+            }
+            {
+              name: 'TARGET_ASSET'
+              value: 'BTC'
+            }
+            {
+              name: 'TARGET_ASSET_NAME'
+              value: 'Bitcoin'
+            }
+            {
+              name: 'TARGET_HORIZON'
+              value: '15m'
+            }
+            {
+              name: 'TARGET_CHAINLINK_SYMBOL'
+              value: 'btc/usd'
+            }
+            {
+              name: 'TARGET_BINANCE_SYMBOL'
+              value: 'btcusdt'
+            }
+            {
+              name: 'TARGET_COINBASE_PRODUCT_ID'
+              value: 'BTC-USD'
             }
             {
               name: 'AZURE_STORAGE_ACCOUNT_NAME'
@@ -200,7 +238,34 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             memory: memory
           }
         }
-      ]
+      ], frontendEnabled ? [
+        {
+          name: 'frontend'
+          image: frontendImage
+          env: [
+            {
+              name: 'NODE_ENV'
+              value: 'production'
+            }
+            {
+              name: 'BACKEND_API_BASE_URL'
+              value: 'http://127.0.0.1:8000/api/v1'
+            }
+            {
+              name: 'BACKEND_WS_URL'
+              value: 'ws://127.0.0.1:8000/api/v1/ws/live'
+            }
+            {
+              name: 'BACKEND_API_BEARER_TOKEN'
+              secretRef: 'api-bearer-token'
+            }
+          ]
+          resources: {
+            cpu: json(frontendCpu)
+            memory: frontendMemory
+          }
+        }
+      ] : [])
       scale: {
         minReplicas: minReplicas
         maxReplicas: maxReplicas

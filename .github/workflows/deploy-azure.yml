@@ -36,6 +36,20 @@ jobs:
           pytest -q tests
           python -m compileall -q src tests
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install and test frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build
+
       - name: Azure login
         uses: azure/login@v2
         with:
@@ -49,28 +63,28 @@ jobs:
             --name "$AZURE_RESOURCE_GROUP" \
             --location "$AZURE_LOCATION"
 
-      - name: Resolve current app image
-        id: current_image
+      - name: Resolve current backend image
+        id: current_backend_image
         run: |
           container_app_name="$APP_NAME-dev"
           image=$(az containerapp show \
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --name "$container_app_name" \
-            --query 'properties.template.containers[0].image' \
+            --query "properties.template.containers[?name=='bot'].image | [0]" \
             -o tsv 2>/dev/null || true)
           if [ -z "$image" ]; then
             image="mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
           fi
           echo "image=$image" >> "$GITHUB_OUTPUT"
 
-      - name: Deploy infrastructure
+      - name: Bootstrap infrastructure
         run: |
           az deployment group create \
             --name "$APP_NAME-infra" \
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --template-file infra/main.bicep \
             --parameters infra/parameters/dev.bicepparam \
-            --parameters appName="$APP_NAME" image="${{ steps.current_image.outputs.image }}" apiBearerToken="${{ secrets.API_BEARER_TOKEN }}"
+            --parameters appName="$APP_NAME" image="${{ steps.current_backend_image.outputs.image }}" apiBearerToken="${{ secrets.API_BEARER_TOKEN }}"
 
       - name: Read deployment outputs
         id: deploy_outputs
@@ -102,26 +116,33 @@ jobs:
             --scope "$acr_id" \
             || true
 
-      - name: Build and push image
+      - name: Build and push images
         run: |
           az acr login --name "${{ steps.deploy_outputs.outputs.acr_name }}"
-          image="${{ steps.deploy_outputs.outputs.acr_login_server }}/polyedge:${{ github.sha }}"
-          docker build -t "$image" .
-          docker push "$image"
-          echo "IMAGE=$image" >> "$GITHUB_ENV"
+          backend_image="${{ steps.deploy_outputs.outputs.acr_login_server }}/polyedge-backend:${{ github.sha }}"
+          frontend_image="${{ steps.deploy_outputs.outputs.acr_login_server }}/polyedge-frontend:${{ github.sha }}"
+          docker build -t "$backend_image" .
+          docker build -f Dockerfile.frontend -t "$frontend_image" .
+          docker push "$backend_image"
+          docker push "$frontend_image"
+          echo "BACKEND_IMAGE=$backend_image" >> "$GITHUB_ENV"
+          echo "FRONTEND_IMAGE=$frontend_image" >> "$GITHUB_ENV"
 
-      - name: Configure registry and deploy app image
+      - name: Deploy application images
         run: |
           az containerapp registry set \
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --name "${{ steps.deploy_outputs.outputs.container_app_name }}" \
             --server "${{ steps.deploy_outputs.outputs.acr_login_server }}" \
-            --identity system
+            --identity system \
+            || true
 
-          az containerapp update \
+          az deployment group create \
+            --name "$APP_NAME-infra" \
             --resource-group "$AZURE_RESOURCE_GROUP" \
-            --name "${{ steps.deploy_outputs.outputs.container_app_name }}" \
-            --image "$IMAGE"
+            --template-file infra/main.bicep \
+            --parameters infra/parameters/dev.bicepparam \
+            --parameters appName="$APP_NAME" image="$BACKEND_IMAGE" frontendImage="$FRONTEND_IMAGE" apiBearerToken="${{ secrets.API_BEARER_TOKEN }}"
 
       - name: Print endpoint
         run: |

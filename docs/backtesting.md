@@ -15,7 +15,7 @@ Run:
 
 ```bash
 source .venv/bin/activate
-polymarket-btc15-bot backtest --path data/events.jsonl
+polyedge backtest --path data/events.jsonl
 ```
 
 ## Current Fill Model

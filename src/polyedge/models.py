@@ -65,7 +65,7 @@ class MarketSpec(BaseModel):
     start_ts: datetime
     end_ts: datetime
     start_price: Decimal | None = None
-    resolution_source: str = "chainlink_btc_usd"
+    resolution_source: str = "chainlink_reference"
     tick_size: Decimal = Decimal("0.01")
     minimum_order_size: Decimal = Decimal("5")
     neg_risk: bool = False

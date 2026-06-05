@@ -8,22 +8,23 @@ from pathlib import Path
 import uvicorn
 
 from .backtest import run_backtest
-from .bot import PolymarketBtc15Bot
+from .bot import PolyEdgeBot
 from .config import load_settings
 from .source_confirmation import confirm_source
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(prog="polymarket-btc15-bot")
+    parser = argparse.ArgumentParser(prog="polyedge")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    subparsers.add_parser("discover", help="Run one BTC 15m market discovery pass.")
-    subparsers.add_parser("confirm-source", help="Confirm Polymarket BTC 15m resolution source and optional Chainlink authenticated report.")
+    subparsers.add_parser("discover", help="Run one configured crypto up/down market discovery pass.")
+    subparsers.add_parser("confirm-source", help="Confirm the configured Polymarket resolution source and optional Chainlink authenticated report.")
     subparsers.add_parser("run", help="Run the observer/trading service.")
 
     backtest_parser = subparsers.add_parser("backtest", help="Replay JSONL events and estimate conservative paper PnL.")
     backtest_parser.add_argument("--path", default="data/events.jsonl")
     backtest_parser.add_argument("--settlement-window-seconds", default=15, type=int)
+    backtest_parser.add_argument("--exact-reference-source", default="polymarket_rtds_chainlink_btc_usd")
 
     api_parser = subparsers.add_parser("api", help="Run the FastAPI control server.")
     api_parser.add_argument("--host", default="127.0.0.1")
@@ -40,13 +41,14 @@ def main() -> None:
         result = run_backtest(
             path=Path(args.path),
             settlement_window_seconds=args.settlement_window_seconds,
+            exact_reference_source=args.exact_reference_source,
         )
         print(json.dumps(result.as_dict(), indent=2))
     elif args.command == "run":
-        asyncio.run(PolymarketBtc15Bot(settings).run_forever())
+        asyncio.run(PolyEdgeBot(settings).run_forever())
     elif args.command == "api":
         uvicorn.run(
-            "polymarket_btc15_bot.api:create_app",
+            "polyedge.api:create_app",
             factory=True,
             host=args.host,
             port=args.port,
@@ -54,7 +56,7 @@ def main() -> None:
 
 
 async def _discover(settings: object) -> None:
-    bot = PolymarketBtc15Bot(settings)  # type: ignore[arg-type]
+    bot = PolyEdgeBot(settings)  # type: ignore[arg-type]
     markets = await bot.discover_once()
     print(json.dumps([market.model_dump(mode="json") for market in markets], indent=2))
 

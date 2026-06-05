@@ -3,9 +3,9 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "polymarket-btc15-bot"
+name = "polyedge"
 version = "0.1.0"
-description = "BTC 15-minute Polymarket fair-value trading bot, paper-first with gated live CLOB execution."
+description = "Paper-first Polymarket crypto up/down fair-value trading backend with gated live CLOB execution."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -35,7 +35,7 @@ research = [
 ]
 
 [project.scripts]
-polymarket-btc15-bot = "polymarket_btc15_bot.main:main"
+polyedge = "polyedge.main:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

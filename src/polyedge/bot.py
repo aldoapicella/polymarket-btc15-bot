@@ -35,7 +35,7 @@ from .runtime.event_bus import RuntimeEventBus
 from .strategy import MakerFirstStrategy
 
 
-class PolymarketBtc15Bot:
+class PolyEdgeBot:
     def __init__(
         self,
         settings: Settings,
@@ -154,7 +154,10 @@ class PolymarketBtc15Bot:
                 asyncio.create_task(
                     self._feed_loop(
                         "rtds-chainlink",
-                        PolymarketRtdsFeed(self.settings, [chainlink_subscription()]),
+                        PolymarketRtdsFeed(
+                            self.settings,
+                            [chainlink_subscription(self.settings.target_chainlink_symbol)],
+                        ),
                     ),
                     name="reference-rtds-chainlink",
                 )
@@ -171,8 +174,8 @@ class PolymarketBtc15Bot:
             )
         self._tasks.extend(
             [
-                asyncio.create_task(self._feed_loop("binance", BinanceBookTickerFeed()), name="reference-binance"),
-                asyncio.create_task(self._feed_loop("coinbase", CoinbaseTickerFeed()), name="reference-coinbase"),
+                asyncio.create_task(self._feed_loop("binance", BinanceBookTickerFeed(self.settings)), name="reference-binance"),
+                asyncio.create_task(self._feed_loop("coinbase", CoinbaseTickerFeed(self.settings)), name="reference-coinbase"),
             ]
         )
         try:
@@ -343,7 +346,7 @@ class PolymarketBtc15Bot:
         )
 
     def _maybe_update_volatility(self, reference: ReferencePrice) -> None:
-        if reference.source != "polymarket_rtds_chainlink_btc_usd":
+        if reference.source != self.settings.rtds_chainlink_source_name:
             return
         key = (reference.source, reference.source_ts, reference.price)
         if key == self._last_volatility_update_key:

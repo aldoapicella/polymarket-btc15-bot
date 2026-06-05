@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from polymarket_btc15_bot.backtest import run_backtest
+from polyedge.backtest import run_backtest
 
 
 def test_backtest_replays_taker_fill_and_settlement(tmp_path) -> None:

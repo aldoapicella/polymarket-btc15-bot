@@ -3,8 +3,8 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from polymarket_btc15_bot.config import Settings
-from polymarket_btc15_bot.reports import ReportBuildRequest, ReportJobManager
+from polyedge.config import Settings
+from polyedge.reports import ReportBuildRequest, ReportJobManager
 
 
 @pytest.mark.asyncio

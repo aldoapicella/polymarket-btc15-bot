@@ -1,7 +1,7 @@
 from decimal import Decimal
 
-from polymarket_btc15_bot.config import Settings
-from polymarket_btc15_bot.market_discovery import MarketDiscovery
+from polyedge.config import Settings
+from polyedge.market_discovery import MarketDiscovery
 
 
 def test_gamma_parser_uses_event_start_time_not_creation_start_date() -> None:
@@ -37,3 +37,22 @@ def test_gamma_parser_uses_event_start_time_not_creation_start_date() -> None:
     assert spec.end_ts.isoformat() == "2026-06-01T22:00:00+00:00"
     assert spec.tick_size == Decimal("0.01")
 
+
+def test_discovery_target_matching_uses_configured_asset_and_horizon() -> None:
+    discovery = MarketDiscovery(
+        Settings(
+            _env_file=None,
+            target_asset="ETH",
+            target_asset_name="Ethereum",
+            target_horizon="15m",
+        )
+    )
+
+    assert discovery._looks_like_target(
+        "eth-updown-15m-1780350300",
+        "Ethereum Up or Down - June 1, 5:45PM-6:00PM ET",
+    )
+    assert not discovery._looks_like_target(
+        "btc-updown-15m-1780350300",
+        "Bitcoin Up or Down - June 1, 5:45PM-6:00PM ET",
+    )

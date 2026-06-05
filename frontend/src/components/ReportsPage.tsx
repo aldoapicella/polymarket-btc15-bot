@@ -257,7 +257,7 @@ function downloadJson(payload: ReportPayload) {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `btc15-report-${new Date().toISOString().slice(0, 19)}.json`;
+  anchor.download = `polyedge-report-${new Date().toISOString().slice(0, 19)}.json`;
   anchor.click();
   URL.revokeObjectURL(url);
 }

@@ -105,7 +105,7 @@ jobs:
       - name: Build and push image
         run: |
           az acr login --name "${{ steps.deploy_outputs.outputs.acr_name }}"
-          image="${{ steps.deploy_outputs.outputs.acr_login_server }}/polymarket-btc15-bot:${{ github.sha }}"
+          image="${{ steps.deploy_outputs.outputs.acr_login_server }}/polyedge:${{ github.sha }}"
           docker build -t "$image" .
           docker push "$image"
           echo "IMAGE=$image" >> "$GITHUB_ENV"

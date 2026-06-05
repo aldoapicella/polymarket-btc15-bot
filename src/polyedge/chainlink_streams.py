@@ -35,9 +35,9 @@ class ChainlinkDataStreamsClient:
         self.base_url = settings.chainlink_data_streams_api_url.rstrip("/")
         self.api_key = settings.chainlink_data_streams_api_key
         self.api_secret = settings.chainlink_data_streams_api_secret
-        self.feed_id = settings.chainlink_btc_usd_feed_id
+        self.feed_id = settings.chainlink_data_streams_feed_id
         if not self.api_key or not self.api_secret or not self.feed_id:
-            raise ValueError("Chainlink Data Streams API key, secret, and BTC/USD feed ID are required")
+            raise ValueError("Chainlink Data Streams API key, secret, and feed ID are required")
 
     async def latest_report(self) -> ChainlinkReport:
         path = "/api/v1/reports/latest"
@@ -95,4 +95,3 @@ def _int_or_none(value: Any) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
-

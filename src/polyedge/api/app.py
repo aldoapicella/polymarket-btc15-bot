@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 
-from ..bot import PolymarketBtc15Bot
+from ..bot import PolyEdgeBot
 from ..config import Settings, load_settings
 from ..reports import ReportJobManager
 from ..runtime.event_bus import RuntimeEventBus
@@ -27,7 +27,7 @@ from .routes_ws import router as ws_router
 def create_app(settings: Settings | None = None) -> FastAPI:
     config = settings or load_settings()
     event_bus = RuntimeEventBus()
-    bot = PolymarketBtc15Bot(config, event_bus=event_bus)
+    bot = PolyEdgeBot(config, event_bus=event_bus)
     report_jobs = ReportJobManager(config)
     snapshot_service = SnapshotService(bot, report_jobs)
     event_service = EventService(config)

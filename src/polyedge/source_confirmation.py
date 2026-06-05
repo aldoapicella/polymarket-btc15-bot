@@ -43,7 +43,7 @@ class SourceConfirmation:
 async def confirm_source(settings: Settings) -> SourceConfirmation:
     discovery = MarketDiscovery(settings)
     markets = await discovery.discover()
-    expected_url = "data.chain.link/streams/btc-usd"
+    expected_url = settings.chainlink_product_url.lower()
     confirmed = [
         market for market in markets
         if expected_url in (market.description or "").lower()
@@ -52,15 +52,15 @@ async def confirm_source(settings: Settings) -> SourceConfirmation:
 
     issues: list[str] = []
     if not markets:
-        issues.append("no BTC 15m markets discovered")
+        issues.append(f"no {settings.target_asset} {settings.target_horizon} markets discovered")
     if markets and not confirmed:
-        issues.append("discovered markets do not mention the expected Chainlink BTC/USD stream URL")
+        issues.append("discovered markets do not mention the expected Chainlink product URL")
 
-    if settings.chainlink_btc_usd_feed_id:
+    if settings.chainlink_data_streams_feed_id:
         issues.extend(
             validate_feed_id_shape(
-                settings.chainlink_btc_usd_feed_id,
-                settings.chainlink_btc_usd_feed_id_suffix,
+                settings.chainlink_data_streams_feed_id,
+                settings.chainlink_feed_id_suffix,
             )
         )
 
@@ -69,7 +69,7 @@ async def confirm_source(settings: Settings) -> SourceConfirmation:
     )
     authenticated_report_checked = False
     authenticated_report: dict[str, Any] | None = None
-    if settings.chainlink_btc_usd_feed_id and api_credentials_configured:
+    if settings.chainlink_data_streams_feed_id and api_credentials_configured:
         try:
             report = await ChainlinkDataStreamsClient(settings).latest_report()
             authenticated_report_checked = True
@@ -80,24 +80,24 @@ async def confirm_source(settings: Settings) -> SourceConfirmation:
                 "is_currentish": report.is_currentish,
                 "has_full_report": bool(report.full_report),
             }
-            if report.feed_id.lower() != settings.chainlink_btc_usd_feed_id.lower():
+            if report.feed_id.lower() != settings.chainlink_data_streams_feed_id.lower():
                 issues.append("authenticated report feedID does not match configured feed ID")
             if not report.is_currentish:
                 issues.append("authenticated report observationsTimestamp is not current")
         except Exception as exc:
             issues.append(f"authenticated Chainlink report check failed: {exc}")
 
-    feed_ready = bool(settings.chainlink_btc_usd_feed_id and api_credentials_configured)
+    feed_ready = bool(settings.chainlink_data_streams_feed_id and api_credentials_configured)
     ok = bool(confirmed) and (not feed_ready or authenticated_report_checked) and not issues
 
     return SourceConfirmation(
         ok=ok,
         polymarket_market_count=len(markets),
         polymarket_confirmed_count=len(confirmed),
-        chainlink_public_url=settings.chainlink_btc_usd_product_url,
-        chainlink_product_name=settings.chainlink_btc_usd_product_name,
-        chainlink_public_feed_id_suffix=settings.chainlink_btc_usd_feed_id_suffix,
-        feed_id_configured=bool(settings.chainlink_btc_usd_feed_id),
+        chainlink_public_url=settings.chainlink_product_url,
+        chainlink_product_name=settings.chainlink_product_name,
+        chainlink_public_feed_id_suffix=settings.chainlink_feed_id_suffix,
+        feed_id_configured=bool(settings.chainlink_data_streams_feed_id),
         api_credentials_configured=api_credentials_configured,
         authenticated_report_checked=authenticated_report_checked,
         issues=issues,
@@ -112,4 +112,3 @@ async def confirm_source(settings: Settings) -> SourceConfirmation:
         ],
         authenticated_report=authenticated_report,
     )
-

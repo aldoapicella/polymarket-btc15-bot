@@ -1,4 +1,4 @@
-from polymarket_btc15_bot.chainlink_streams import validate_feed_id_shape
+from polyedge.chainlink_streams import validate_feed_id_shape
 
 
 def test_validate_feed_id_shape_accepts_32_byte_hex_with_suffix() -> None:

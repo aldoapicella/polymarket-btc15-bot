@@ -3,13 +3,13 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from ..bot import PolymarketBtc15Bot
+from ..bot import PolyEdgeBot
 from ..models import ExecutionReport, MarketSpec, TradeDecision
 from ..reports import ReportJobManager
 
 
 class SnapshotService:
-    def __init__(self, bot: PolymarketBtc15Bot, report_jobs: ReportJobManager):
+    def __init__(self, bot: PolyEdgeBot, report_jobs: ReportJobManager):
         self.bot = bot
         self.report_jobs = report_jobs
 

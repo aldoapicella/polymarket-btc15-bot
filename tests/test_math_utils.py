@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from polymarket_btc15_bot.math_utils import crypto_taker_fee_per_share, floor_to_tick
+from polyedge.math_utils import crypto_taker_fee_per_share, floor_to_tick
 
 
 def test_crypto_taker_fee_per_share_midpoint() -> None:

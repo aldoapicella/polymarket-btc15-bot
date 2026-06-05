@@ -13,8 +13,8 @@ from .config import Settings
 from .models import ReferencePrice, utc_now
 
 
-CHAINLINK_BTC_USD_SYMBOL = "btc/usd"
-BINANCE_BTCUSDT_SYMBOL = "btcusdt"
+DEFAULT_CHAINLINK_SYMBOL = "btc/usd"
+DEFAULT_BINANCE_SYMBOL = "btcusdt"
 
 
 class PolymarketRtdsFeed:
@@ -35,7 +35,13 @@ class PolymarketRtdsFeed:
                     await websocket.send(json.dumps(payload))
                     ping_task = asyncio.create_task(self._send_pings(websocket))
                     async for raw_message in websocket:
-                        reference = parse_rtds_message(raw_message)
+                        reference = parse_rtds_message(
+                            raw_message,
+                            chainlink_symbol=self.settings.target_chainlink_symbol,
+                            binance_symbol=self.settings.target_binance_symbol,
+                            chainlink_source=self.settings.rtds_chainlink_source_name,
+                            binance_source=self.settings.rtds_binance_source_name,
+                        )
                         if reference is not None:
                             yield reference
             except asyncio.CancelledError:
@@ -58,13 +64,13 @@ class PolymarketRtdsFeed:
     def _settings_subscriptions(self) -> list[dict[str, str]]:
         subscriptions: list[dict[str, str]] = []
         if self.settings.enable_polymarket_rtds_chainlink:
-            subscriptions.append(chainlink_subscription(CHAINLINK_BTC_USD_SYMBOL))
+            subscriptions.append(chainlink_subscription(self.settings.target_chainlink_symbol))
         if self.settings.enable_polymarket_rtds_binance:
             subscriptions.append(binance_subscription())
         return subscriptions
 
 
-def chainlink_subscription(symbol: str = CHAINLINK_BTC_USD_SYMBOL) -> dict[str, str]:
+def chainlink_subscription(symbol: str = DEFAULT_CHAINLINK_SYMBOL) -> dict[str, str]:
     return {
         "topic": "crypto_prices_chainlink",
         "type": "*",
@@ -79,7 +85,14 @@ def binance_subscription() -> dict[str, str]:
     }
 
 
-def parse_rtds_message(raw_message: str | bytes | dict[str, Any]) -> ReferencePrice | None:
+def parse_rtds_message(
+    raw_message: str | bytes | dict[str, Any],
+    *,
+    chainlink_symbol: str = DEFAULT_CHAINLINK_SYMBOL,
+    binance_symbol: str = DEFAULT_BINANCE_SYMBOL,
+    chainlink_source: str = "polymarket_rtds_chainlink_btc_usd",
+    binance_source: str = "polymarket_rtds_binance_btcusdt",
+) -> ReferencePrice | None:
     payload = _decode(raw_message)
     if payload is None:
         return None
@@ -100,9 +113,9 @@ def parse_rtds_message(raw_message: str | bytes | dict[str, Any]) -> ReferencePr
     local_ts = utc_now()
     latency_ms = max(0.0, (local_ts - source_ts).total_seconds() * 1000.0)
 
-    if topic == "crypto_prices_chainlink" and symbol == CHAINLINK_BTC_USD_SYMBOL:
+    if topic == "crypto_prices_chainlink" and symbol == chainlink_symbol.lower():
         return ReferencePrice(
-            source="polymarket_rtds_chainlink_btc_usd",
+            source=chainlink_source,
             price=price,
             source_ts=source_ts,
             local_ts=local_ts,
@@ -110,9 +123,9 @@ def parse_rtds_message(raw_message: str | bytes | dict[str, Any]) -> ReferencePr
             exact_resolution_source=True,
         )
 
-    if topic == "crypto_prices" and symbol == BINANCE_BTCUSDT_SYMBOL:
+    if topic == "crypto_prices" and symbol == binance_symbol.lower():
         return ReferencePrice(
-            source="polymarket_rtds_binance_btcusdt",
+            source=binance_source,
             price=price,
             source_ts=source_ts,
             local_ts=local_ts,

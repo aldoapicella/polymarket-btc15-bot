@@ -1,12 +1,13 @@
-# BTC 15-Min Polymarket Strategy and Math
+# PolyEdge Strategy and Math
 
 This document is the implementation spec for the first version of the bot.
 The code must follow these rules before any live trading is enabled.
 
 ## Objective
 
-Build a BTC-only bot for Polymarket's rolling 15-minute Up/Down crypto
-markets. The bot estimates the fair probability that BTC finishes Up at
+Build a configurable bot for Polymarket's rolling crypto Up/Down markets.
+The current default target is BTC 15-minute. The bot estimates the fair
+probability that the configured asset finishes Up at
 expiry, compares that probability to the executable CLOB bid/ask, and trades
 only when the edge survives fees, spread, slippage, latency, model error, and
 risk limits.
@@ -185,7 +186,8 @@ The deduplication key is:
 (source, source_ts, price)
 ```
 
-where `source` must be `polymarket_rtds_chainlink_btc_usd`.
+where `source` defaults to `polymarket_rtds_chainlink_btc_usd` for the BTC
+15-minute configuration.
 
 ## Drift Estimate
 
@@ -522,7 +524,7 @@ Ignoring cancel latency
 The current replay command is:
 
 ```bash
-polymarket-btc15-bot backtest --path data/events.jsonl
+polyedge backtest --path data/events.jsonl
 ```
 
 The first implementation is intentionally conservative:
@@ -564,7 +566,7 @@ The first milestone is not profit. It is reliable observation and replay.
 Milestone 1:
 
 ```text
-Discover BTC 15m markets
+Discover configured crypto Up/Down markets
 Maintain Up and Down order books
 Track reference price
 Compute q_up/q_down

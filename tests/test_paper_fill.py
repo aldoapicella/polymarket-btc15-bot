@@ -3,9 +3,9 @@ from decimal import Decimal
 
 import pytest
 
-from polymarket_btc15_bot.config import Settings
-from polymarket_btc15_bot.execution import PaperExecutionClient
-from polymarket_btc15_bot.models import (
+from polyedge.config import Settings
+from polyedge.execution import PaperExecutionClient
+from polyedge.models import (
     BookLevel,
     BookState,
     DecisionAction,
@@ -16,7 +16,7 @@ from polymarket_btc15_bot.models import (
     TradeDecision,
     utc_now,
 )
-from polymarket_btc15_bot.paper_fill import PaperFillEngine
+from polyedge.paper_fill import PaperFillEngine
 
 
 def _market(now=None) -> MarketSpec:

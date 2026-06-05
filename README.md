@@ -1,7 +1,9 @@
-# Polymarket BTC 15-Min Bot
+# PolyEdge
 
-Python-first, paper-default trading system for BTC 15-minute Polymarket
-Up/Down markets. The strategy and math are documented in
+Python-first, paper-default trading system for crypto Up/Down Polymarket
+markets. The current default target is BTC 15-minute Up/Down, but the runtime
+is structured around configurable asset, horizon, discovery, reference, risk,
+and execution settings. The strategy and math are documented in
 [docs/strategy.md](docs/strategy.md).
 
 The bot is built to observe, record, paper trade, and replay before any live
@@ -9,8 +11,8 @@ orders are enabled. Live international CLOB execution is hard-gated by config,
 jurisdiction confirmation, wallet credentials, risk checks, and exact
 resolution-source checks.
 
-For BTC 15-minute markets, the primary free reference source is Polymarket RTDS
-Chainlink `btc/usd`:
+For the default BTC 15-minute target, the primary free reference source is
+Polymarket RTDS Chainlink `btc/usd`:
 
 ```text
 wss://ws-live-data.polymarket.com
@@ -33,19 +35,19 @@ pytest
 Run the API in paper mode:
 
 ```bash
-uvicorn polymarket_btc15_bot.api:create_app --factory --host 127.0.0.1 --port 8000
+uvicorn polyedge.api:create_app --factory --host 127.0.0.1 --port 8000
 ```
 
 Run one discovery pass:
 
 ```bash
-polymarket-btc15-bot discover
+polyedge discover
 ```
 
 Replay collected events:
 
 ```bash
-polymarket-btc15-bot backtest --path data/events.jsonl
+polyedge backtest --path data/events.jsonl
 ```
 
 Replay assumptions and the difference between runtime paper fills and offline
@@ -65,14 +67,14 @@ GET  /reports/latest
 GET  /reports/daily/YYYY-MM-DD
 ```
 
-Confirm the Polymarket/Chainlink BTC 15m source:
+Confirm the configured Polymarket/Chainlink source:
 
 ```bash
-polymarket-btc15-bot confirm-source
+polyedge confirm-source
 ```
 
-This confirms the public Polymarket market rules mention the Chainlink BTC/USD
-Data Stream. If `CHAINLINK_BTC_USD_FEED_ID`,
+This confirms the public Polymarket market rules mention the configured
+Chainlink product URL. If `CHAINLINK_DATA_STREAMS_FEED_ID`,
 `CHAINLINK_DATA_STREAMS_API_KEY`, and `CHAINLINK_DATA_STREAMS_API_SECRET` are
 configured, it also validates the authenticated Chainlink latest-report
 response.
@@ -98,16 +100,16 @@ bypass platform restrictions.
 
 ```text
 docs/strategy.md                  detailed strategy and math
-src/polymarket_btc15_bot/config.py
-src/polymarket_btc15_bot/models.py
-src/polymarket_btc15_bot/market_discovery.py
-src/polymarket_btc15_bot/polymarket_feed.py
-src/polymarket_btc15_bot/resolution_feed.py
-src/polymarket_btc15_bot/fair_value.py
-src/polymarket_btc15_bot/strategy.py
-src/polymarket_btc15_bot/risk.py
-src/polymarket_btc15_bot/execution.py
-src/polymarket_btc15_bot/recorder.py
-src/polymarket_btc15_bot/api.py
+src/polyedge/config.py
+src/polyedge/models.py
+src/polyedge/market_discovery.py
+src/polyedge/polymarket_feed.py
+src/polyedge/resolution_feed.py
+src/polyedge/fair_value.py
+src/polyedge/strategy.py
+src/polyedge/risk.py
+src/polyedge/execution.py
+src/polyedge/recorder.py
+src/polyedge/api/
 tests/
 ```

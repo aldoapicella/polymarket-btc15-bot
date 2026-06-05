@@ -21,5 +21,5 @@ USER appuser
 
 EXPOSE 8000
 
-CMD ["polymarket-btc15-bot", "api", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["polyedge", "api", "--host", "0.0.0.0", "--port", "8000"]
 

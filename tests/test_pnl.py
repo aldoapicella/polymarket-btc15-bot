@@ -1,7 +1,7 @@
 import json
 from decimal import Decimal
 
-from polymarket_btc15_bot.pnl import build_pnl_report
+from polyedge.pnl import build_pnl_report
 
 
 def test_pnl_report_separates_actual_paper_from_replay_estimate(tmp_path) -> None:

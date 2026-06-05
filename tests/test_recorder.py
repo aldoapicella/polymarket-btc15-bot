@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
-from polymarket_btc15_bot.recorder import AzureStorageRecorder, CompositeRecorder, JsonlRecorder
+from polyedge.recorder import AzureStorageRecorder, CompositeRecorder, JsonlRecorder
 
 
 class FakeBlob:

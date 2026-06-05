@@ -1,8 +1,8 @@
 from datetime import timedelta
 from decimal import Decimal
 
-from polymarket_btc15_bot.models import DecisionAction, ExecutionReport, OrderKind, Side, TradeDecision, utc_now
-from polymarket_btc15_bot.order_manager import OrderManager
+from polyedge.models import DecisionAction, ExecutionReport, OrderKind, Side, TradeDecision, utc_now
+from polyedge.order_manager import OrderManager
 
 
 def _maker_decision(price: str = "0.51") -> TradeDecision:

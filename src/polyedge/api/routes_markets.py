@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi import status as http_status
 
-from ..bot import PolymarketBtc15Bot
+from ..bot import PolyEdgeBot
 from ..services.event_service import EventService
 from ..services.snapshot import SnapshotService
 from ..source_confirmation import confirm_source
@@ -67,12 +67,12 @@ async def recent_events(
 
 
 @router.post("/markets/discover")
-async def versioned_discover(bot: PolymarketBtc15Bot = Depends(get_bot)) -> dict[str, Any]:
+async def versioned_discover(bot: PolyEdgeBot = Depends(get_bot)) -> dict[str, Any]:
     return await _discover(bot)
 
 
 @legacy_router.post("/discover")
-async def legacy_discover(bot: PolymarketBtc15Bot = Depends(get_bot)) -> dict[str, Any]:
+async def legacy_discover(bot: PolyEdgeBot = Depends(get_bot)) -> dict[str, Any]:
     return await _discover(bot)
 
 
@@ -89,7 +89,7 @@ async def legacy_confirm_resolution_source(settings: Settings = Depends(get_sett
 @router.post("/evaluate")
 async def versioned_evaluate(
     execute: bool = False,
-    bot: PolymarketBtc15Bot = Depends(get_bot),
+    bot: PolyEdgeBot = Depends(get_bot),
 ) -> dict[str, Any]:
     return await _evaluate(bot, execute)
 
@@ -97,12 +97,12 @@ async def versioned_evaluate(
 @legacy_router.post("/evaluate")
 async def legacy_evaluate(
     execute: bool = False,
-    bot: PolymarketBtc15Bot = Depends(get_bot),
+    bot: PolyEdgeBot = Depends(get_bot),
 ) -> dict[str, Any]:
     return await _evaluate(bot, execute)
 
 
-async def _discover(bot: PolymarketBtc15Bot) -> dict[str, Any]:
+async def _discover(bot: PolyEdgeBot) -> dict[str, Any]:
     discovered = await bot.discover_once()
     return {
         "count": len(discovered),
@@ -115,7 +115,7 @@ async def _confirm_resolution_source(settings: Settings) -> dict[str, Any]:
     return confirmation.as_dict()
 
 
-async def _evaluate(bot: PolymarketBtc15Bot, execute: bool) -> dict[str, Any]:
+async def _evaluate(bot: PolyEdgeBot, execute: bool) -> dict[str, Any]:
     emitted = await bot.evaluate_once(execute=execute)
     return {
         "count": len(emitted),

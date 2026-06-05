@@ -1,8 +1,9 @@
-# Chainlink BTC/USD Source Confirmation
+# Chainlink Source Confirmation
 
-Polymarket BTC 15-minute Up/Down markets resolve from Chainlink Data Streams,
-not Binance, Coinbase, or the older push-based Chainlink on-chain BTC/USD price
-feed. For v1, the bot uses Polymarket RTDS Chainlink `btc/usd` as the primary
+The default PolyEdge BTC 15-minute Up/Down target resolves from Chainlink Data
+Streams, not Binance, Coinbase, or the older push-based Chainlink on-chain
+BTC/USD price feed. For this default target, the bot uses Polymarket RTDS
+Chainlink `btc/usd` as the primary
 free public source.
 
 ## Free RTDS Source
@@ -33,7 +34,7 @@ gated live decisions. Binance/Coinbase feeds are used only as cross-checks.
 
 ## Public Source
 
-Current Polymarket BTC 15m market descriptions say:
+Current Polymarket BTC 15m market descriptions for the default target say:
 
 ```text
 The resolution source for this market is information from Chainlink,
@@ -94,7 +95,7 @@ Run:
 
 ```bash
 source .venv/bin/activate
-polymarket-btc15-bot confirm-source
+polyedge confirm-source
 ```
 
 Without Chainlink credentials, the command verifies the Polymarket market text
@@ -102,7 +103,7 @@ and reports that authenticated report checking was skipped. With credentials and
 full feed ID configured, it calls `/api/v1/reports/latest` and confirms:
 
 ```text
-report.feedID matches CHAINLINK_BTC_USD_FEED_ID
+report.feedID matches CHAINLINK_DATA_STREAMS_FEED_ID
 observationsTimestamp is current
 fullReport exists
 ```

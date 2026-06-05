@@ -1,8 +1,8 @@
 from datetime import timedelta
 from decimal import Decimal
 
-from polymarket_btc15_bot.config import Settings
-from polymarket_btc15_bot.models import (
+from polyedge.config import Settings
+from polyedge.models import (
     BookLevel,
     BookState,
     MarketSpec,
@@ -10,7 +10,7 @@ from polymarket_btc15_bot.models import (
     ReferencePrice,
     utc_now,
 )
-from polymarket_btc15_bot.risk import RiskManager
+from polyedge.risk import RiskManager
 
 
 def _market() -> MarketSpec:

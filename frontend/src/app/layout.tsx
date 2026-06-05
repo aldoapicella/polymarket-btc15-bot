@@ -10,7 +10,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "BTC15 Control Plane",
+  title: "PolyEdge Control Plane",
   description: "Paper-first trading control plane and observability dashboard."
 };
 

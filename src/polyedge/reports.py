@@ -393,7 +393,7 @@ def _report_markdown(report: dict[str, Any]) -> str:
     actual = report.get("actual_paper") or {}
     replay = report.get("replay_estimate") or {}
     lines = [
-        "# BTC 15m Paper PnL Report",
+        "# PolyEdge Paper PnL Report",
         "",
         f"- Generated: {report.get('generated_ts')}",
         f"- Source: {source.get('type')}",

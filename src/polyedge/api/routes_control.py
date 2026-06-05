@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends
 
-from ..bot import PolymarketBtc15Bot
+from ..bot import PolyEdgeBot
 from ..config import Settings
 from ..runtime.event_bus import RuntimeEventBus
 from ..services.audit import AuditLog
@@ -39,7 +39,7 @@ async def legacy_kill_switch(
 @router.post("/pause")
 async def pause(
     request: ControlActionRequest,
-    bot: PolymarketBtc15Bot = Depends(get_bot),
+    bot: PolyEdgeBot = Depends(get_bot),
     audit_log: AuditLog = Depends(get_audit_log),
 ) -> dict[str, Any]:
     before = bot.control_status()
@@ -59,7 +59,7 @@ async def pause(
 @router.post("/resume")
 async def resume(
     request: ControlActionRequest,
-    bot: PolymarketBtc15Bot = Depends(get_bot),
+    bot: PolyEdgeBot = Depends(get_bot),
     audit_log: AuditLog = Depends(get_audit_log),
 ) -> dict[str, Any]:
     before = bot.control_status()

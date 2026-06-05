@@ -16,7 +16,7 @@ class Settings(BaseSettings):
         case_sensitive=False,
     )
 
-    app_name: str = "polymarket-btc15-bot"
+    app_name: str = "polyedge"
     execution_mode: Literal["paper", "live"] = "paper"
     require_api_auth: bool = False
     api_bearer_token: str | None = None
@@ -34,18 +34,23 @@ class Settings(BaseSettings):
     polymarket_signature_type: int = 1
     polymarket_chain_id: int = 137
 
-    chainlink_btc_usd_url: str | None = None
+    chainlink_reference_url: str | None = None
     chainlink_api_key: str | None = None
     chainlink_data_streams_api_url: str = "https://api.dataengine.chain.link"
     chainlink_data_streams_api_key: str | None = None
     chainlink_data_streams_api_secret: str | None = None
-    chainlink_btc_usd_feed_id: str | None = None
-    chainlink_btc_usd_product_url: str = "https://data.chain.link/streams/btc-usd"
-    chainlink_btc_usd_product_name: str = "BTC/USD-RefPrice-DS-Premium-Global-003"
-    chainlink_btc_usd_feed_id_suffix: str = "75b8"
+    chainlink_data_streams_feed_id: str | None = None
+    chainlink_product_url: str = "https://data.chain.link/streams/btc-usd"
+    chainlink_product_name: str = "BTC/USD-RefPrice-DS-Premium-Global-003"
+    chainlink_feed_id_suffix: str = "75b8"
 
     target_asset: str = "BTC"
+    target_asset_name: str = "Bitcoin"
     target_horizon: str = "15m"
+    target_resolution_source: str = "chainlink_reference"
+    target_chainlink_symbol: str = "btc/usd"
+    target_binance_symbol: str = "btcusdt"
+    target_coinbase_product_id: str = "BTC-USD"
     discovery_limit: int = 250
     discovery_interval_seconds: float = 20.0
     enable_polymarket_rtds_chainlink: bool = True
@@ -111,6 +116,31 @@ class Settings(BaseSettings):
     def normalize_horizon(cls, value: str) -> str:
         return value.lower()
 
+    @field_validator("target_chainlink_symbol", "target_binance_symbol")
+    @classmethod
+    def normalize_symbol(cls, value: str) -> str:
+        return value.lower()
+
+    @property
+    def rtds_chainlink_source_name(self) -> str:
+        normalized = self.target_chainlink_symbol.replace("/", "_").replace("-", "_").lower()
+        return f"polymarket_rtds_chainlink_{normalized}"
+
+    @property
+    def rtds_binance_source_name(self) -> str:
+        normalized = self.target_binance_symbol.replace("/", "").replace("-", "").lower()
+        return f"polymarket_rtds_binance_{normalized}"
+
+    @property
+    def binance_book_ticker_source_name(self) -> str:
+        normalized = self.target_binance_symbol.replace("/", "").replace("-", "").lower()
+        return f"binance_{normalized}_book_ticker"
+
+    @property
+    def coinbase_ticker_source_name(self) -> str:
+        normalized = self.target_coinbase_product_id.replace("-", "_").replace("/", "_").lower()
+        return f"coinbase_{normalized}_ticker"
+
     @property
     def live_requested(self) -> bool:
         return self.execution_mode == "live"
@@ -118,7 +148,7 @@ class Settings(BaseSettings):
     @property
     def exact_resolution_source_configured(self) -> bool:
         return bool(
-            self.chainlink_btc_usd_feed_id
+            self.chainlink_data_streams_feed_id
             and self.chainlink_data_streams_api_key
             and self.chainlink_data_streams_api_secret
         )

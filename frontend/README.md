@@ -1,6 +1,6 @@
-# BTC15 Control Plane Frontend
+# PolyEdge Control Plane Frontend
 
-Next.js dashboard for the paper-first Polymarket BTC 15m backend.
+Next.js dashboard for the paper-first PolyEdge backend.
 
 ```bash
 cp .env.example .env.local

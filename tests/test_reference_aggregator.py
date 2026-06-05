@@ -1,7 +1,7 @@
 from decimal import Decimal
 
-from polymarket_btc15_bot.models import ReferencePrice, utc_now
-from polymarket_btc15_bot.resolution_feed import ReferenceAggregator
+from polyedge.models import ReferencePrice, utc_now
+from polyedge.resolution_feed import ReferenceAggregator
 
 
 def test_reference_aggregator_prefers_rtds_chainlink() -> None:

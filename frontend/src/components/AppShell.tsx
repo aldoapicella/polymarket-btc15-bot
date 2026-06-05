@@ -25,7 +25,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </span>
             <span className="min-w-0">
               <span className="block truncate text-sm font-semibold uppercase text-ink">
-                BTC15 Control Plane
+                PolyEdge Control Plane
               </span>
               <span className="block truncate text-xs text-ink/60">Paper-first operations</span>
             </span>

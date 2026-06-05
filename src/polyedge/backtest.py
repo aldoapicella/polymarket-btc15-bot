@@ -14,6 +14,7 @@ from .math_utils import crypto_taker_fee_per_share
 class BacktestConfig:
     path: Path
     settlement_window_seconds: int = 15
+    exact_reference_source: str = "polymarket_rtds_chainlink_btc_usd"
     maker_fill_policy: str = "touch"
     max_book_age_ms: int = 1500
     final_no_trade_seconds: int = 30
@@ -178,7 +179,7 @@ class ReplayBacktester:
             market.start_price = price
 
     def _handle_reference(self, payload: dict[str, Any]) -> None:
-        if payload.get("source") != "polymarket_rtds_chainlink_btc_usd":
+        if payload.get("source") != self.config.exact_reference_source:
             return
         if payload.get("stale"):
             return
@@ -404,9 +405,17 @@ class ReplayBacktester:
         return max(candidates, key=lambda item: item[0])[1]
 
 
-def run_backtest(path: Path, settlement_window_seconds: int = 15) -> BacktestResult:
+def run_backtest(
+    path: Path,
+    settlement_window_seconds: int = 15,
+    exact_reference_source: str = "polymarket_rtds_chainlink_btc_usd",
+) -> BacktestResult:
     return ReplayBacktester(
-        BacktestConfig(path=path, settlement_window_seconds=settlement_window_seconds)
+        BacktestConfig(
+            path=path,
+            settlement_window_seconds=settlement_window_seconds,
+            exact_reference_source=exact_reference_source,
+        )
     ).run()
 
 

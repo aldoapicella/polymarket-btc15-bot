@@ -17,7 +17,9 @@ from .models import ReferencePrice, utc_now
 
 
 class BinanceBookTickerFeed:
-    url = "wss://stream.binance.com:9443/ws/btcusdt@bookTicker"
+    def __init__(self, settings: Settings):
+        self.settings = settings
+        self.url = f"wss://stream.binance.com:9443/ws/{settings.target_binance_symbol}@bookTicker"
 
     async def stream(self) -> AsyncIterator[ReferencePrice]:
         while True:
@@ -32,7 +34,7 @@ class BinanceBookTickerFeed:
                         price = (bid + ask) / Decimal("2")
                         now = utc_now()
                         yield ReferencePrice(
-                            source="binance_btcusdt_book_ticker",
+                            source=self.settings.binance_book_ticker_source_name,
                             price=price,
                             source_ts=now,
                             local_ts=now,
@@ -48,10 +50,13 @@ class BinanceBookTickerFeed:
 class CoinbaseTickerFeed:
     url = "wss://ws-feed.exchange.coinbase.com"
 
+    def __init__(self, settings: Settings):
+        self.settings = settings
+
     async def stream(self) -> AsyncIterator[ReferencePrice]:
         subscribe = {
             "type": "subscribe",
-            "product_ids": ["BTC-USD"],
+            "product_ids": [self.settings.target_coinbase_product_id],
             "channels": ["ticker"],
         }
         while True:
@@ -68,7 +73,7 @@ class CoinbaseTickerFeed:
                         source_ts = _parse_datetime(payload.get("time")) or utc_now()
                         local_ts = utc_now()
                         yield ReferencePrice(
-                            source="coinbase_btc_usd_ticker",
+                            source=self.settings.coinbase_ticker_source_name,
                             price=price,
                             source_ts=source_ts,
                             local_ts=local_ts,
@@ -86,14 +91,14 @@ class ChainlinkHttpReference:
         self.settings = settings
 
     async def fetch_once(self) -> ReferencePrice | None:
-        if not self.settings.chainlink_btc_usd_url:
+        if not self.settings.chainlink_reference_url:
             return None
         headers = {}
         if self.settings.chainlink_api_key:
             headers["Authorization"] = f"Bearer {self.settings.chainlink_api_key}"
 
         async with httpx.AsyncClient(timeout=httpx.Timeout(5.0)) as client:
-            response = await client.get(self.settings.chainlink_btc_usd_url, headers=headers)
+            response = await client.get(self.settings.chainlink_reference_url, headers=headers)
             response.raise_for_status()
             payload = response.json()
         price = _extract_price(payload)
@@ -102,7 +107,7 @@ class ChainlinkHttpReference:
         source_ts = _extract_timestamp(payload) or utc_now()
         local_ts = utc_now()
         return ReferencePrice(
-            source="chainlink_btc_usd",
+            source=self.settings.target_resolution_source,
             price=price,
             source_ts=source_ts,
             local_ts=local_ts,

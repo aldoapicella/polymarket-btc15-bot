@@ -1,8 +1,8 @@
 from datetime import timedelta
 from decimal import Decimal
 
-from polymarket_btc15_bot.config import Settings
-from polymarket_btc15_bot.models import (
+from polyedge.config import Settings
+from polyedge.models import (
     BookLevel,
     BookState,
     DecisionAction,
@@ -12,7 +12,7 @@ from polymarket_btc15_bot.models import (
     OrderKind,
     utc_now,
 )
-from polymarket_btc15_bot.strategy import MakerFirstStrategy
+from polyedge.strategy import MakerFirstStrategy
 
 
 def test_strategy_places_safe_maker_bid_one_tick_above_best_bid() -> None:

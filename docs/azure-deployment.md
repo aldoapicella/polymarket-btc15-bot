@@ -79,7 +79,7 @@ API_BEARER_TOKEN
 `id-github-polymarket-btc15-dev`, with a federated credential for:
 
 ```text
-repo:aldoapicella/polymarket-btc15-bot:ref:refs/heads/main
+repo:aldoapicella/polyedge:ref:refs/heads/main
 ```
 
 That identity has these roles scoped only to `rg-polymarket-btc15-dev`:

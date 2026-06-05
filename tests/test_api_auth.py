@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
-from polymarket_btc15_bot.api import create_app
-from polymarket_btc15_bot.config import Settings
+from polyedge.api import create_app
+from polyedge.config import Settings
 
 
 def test_api_allows_health_without_auth_when_disabled(tmp_path) -> None:

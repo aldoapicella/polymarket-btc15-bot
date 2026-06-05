@@ -5,10 +5,10 @@ from decimal import Decimal
 
 import pytest
 
-from polymarket_btc15_bot.bot import PolymarketBtc15Bot
-from polymarket_btc15_bot.config import Settings
-from polymarket_btc15_bot.execution import PaperExecutionClient
-from polymarket_btc15_bot.models import (
+from polyedge.bot import PolyEdgeBot
+from polyedge.config import Settings
+from polyedge.execution import PaperExecutionClient
+from polyedge.models import (
     BookLevel,
     BookState,
     DecisionAction,
@@ -20,7 +20,7 @@ from polymarket_btc15_bot.models import (
     TradeDecision,
     utc_now,
 )
-from polymarket_btc15_bot.recorder import JsonlRecorder
+from polyedge.recorder import JsonlRecorder
 
 
 def _settings(tmp_path, **updates) -> Settings:
@@ -52,7 +52,7 @@ def _market(now=None) -> MarketSpec:
 async def test_bot_generates_runtime_paper_maker_fill_from_book_touch(tmp_path) -> None:
     settings = _settings(tmp_path)
     execution = PaperExecutionClient()
-    bot = PolymarketBtc15Bot(
+    bot = PolyEdgeBot(
         settings,
         execution_client=execution,
         recorder=JsonlRecorder(settings.recorder_path),
@@ -92,7 +92,7 @@ async def test_bot_generates_runtime_paper_maker_fill_from_book_touch(tmp_path) 
 @pytest.mark.asyncio
 async def test_bot_restarts_market_feed_when_token_set_changes(tmp_path) -> None:
     settings = _settings(tmp_path)
-    bot = PolymarketBtc15Bot(
+    bot = PolyEdgeBot(
         settings,
         execution_client=PaperExecutionClient(),
         recorder=JsonlRecorder(settings.recorder_path),
@@ -130,7 +130,7 @@ async def test_bot_restarts_market_feed_when_token_set_changes(tmp_path) -> None
 def test_bot_clears_active_exposure_after_exact_chainlink_settlement(tmp_path) -> None:
     settings = _settings(tmp_path)
     execution = PaperExecutionClient()
-    bot = PolymarketBtc15Bot(
+    bot = PolyEdgeBot(
         settings,
         execution_client=execution,
         recorder=JsonlRecorder(settings.recorder_path),

@@ -1,9 +1,9 @@
 from datetime import timedelta
 from decimal import Decimal
 
-from polymarket_btc15_bot.config import Settings
-from polymarket_btc15_bot.fair_value import LogReturnFairValueModel
-from polymarket_btc15_bot.models import MarketSpec, MarketStatus, ReferencePrice, utc_now
+from polyedge.config import Settings
+from polyedge.fair_value import LogReturnFairValueModel
+from polyedge.models import MarketSpec, MarketStatus, ReferencePrice, utc_now
 
 
 def _market(start_price: Decimal) -> MarketSpec:

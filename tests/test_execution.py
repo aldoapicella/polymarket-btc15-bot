@@ -3,9 +3,9 @@ from collections import defaultdict
 
 import pytest
 
-from polymarket_btc15_bot.config import Settings
-from polymarket_btc15_bot.execution import LiveClobExecutionClient, PaperExecutionClient, _market_order_amount
-from polymarket_btc15_bot.models import DecisionAction, OrderKind, Side, TradeDecision
+from polyedge.config import Settings
+from polyedge.execution import LiveClobExecutionClient, PaperExecutionClient, _market_order_amount
+from polyedge.models import DecisionAction, OrderKind, Side, TradeDecision
 
 
 def test_market_buy_amount_uses_quote_amount_when_present() -> None:

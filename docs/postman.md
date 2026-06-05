@@ -3,11 +3,11 @@
 Import these two files into Postman:
 
 ```text
-postman/polymarket-btc15-bot.postman_collection.json
-postman/polymarket-btc15-bot.postman_environment.json
+postman/polyedge.postman_collection.json
+postman/polyedge.postman_environment.json
 ```
 
-Select the `Polymarket BTC 15m Bot - Azure` environment before sending
+Select the `PolyEdge - Azure` environment before sending
 requests.
 
 ## Token Setup
@@ -30,7 +30,7 @@ Copy it to your clipboard without printing it:
 Then in Postman:
 
 ```text
-Environment -> Polymarket BTC 15m Bot - Azure
+Environment -> PolyEdge - Azure
 api_bearer_token -> Current value -> paste
 ```
 

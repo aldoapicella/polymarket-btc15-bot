@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import Depends, Header, HTTPException, Request, WebSocket, WebSocketException
 from fastapi import status as http_status
 
-from ..bot import PolymarketBtc15Bot
+from ..bot import PolyEdgeBot
 from ..config import Settings
 from ..reports import ReportJobManager
 from ..runtime.event_bus import RuntimeEventBus
@@ -17,7 +17,7 @@ def get_settings(request: Request) -> Settings:
     return request.app.state.settings
 
 
-def get_bot(request: Request) -> PolymarketBtc15Bot:
+def get_bot(request: Request) -> PolyEdgeBot:
     return request.app.state.bot
 
 

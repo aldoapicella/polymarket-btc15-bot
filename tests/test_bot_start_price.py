@@ -1,11 +1,11 @@
 from datetime import timedelta
 from decimal import Decimal
 
-from polymarket_btc15_bot.bot import PolymarketBtc15Bot
-from polymarket_btc15_bot.config import Settings
-from polymarket_btc15_bot.execution import PaperExecutionClient
-from polymarket_btc15_bot.models import MarketSpec, MarketStatus, ReferencePrice, utc_now
-from polymarket_btc15_bot.recorder import JsonlRecorder
+from polyedge.bot import PolyEdgeBot
+from polyedge.config import Settings
+from polyedge.execution import PaperExecutionClient
+from polyedge.models import MarketSpec, MarketStatus, ReferencePrice, utc_now
+from polyedge.recorder import JsonlRecorder
 
 
 def test_bot_captures_rtds_chainlink_start_price_within_grace(tmp_path) -> None:
@@ -14,7 +14,7 @@ def test_bot_captures_rtds_chainlink_start_price_within_grace(tmp_path) -> None:
         recorder_path=tmp_path / "events.jsonl",
         kill_switch_file=tmp_path / "KILL_SWITCH",
     )
-    bot = PolymarketBtc15Bot(
+    bot = PolyEdgeBot(
         settings,
         execution_client=PaperExecutionClient(),
         recorder=JsonlRecorder(settings.recorder_path),
@@ -52,7 +52,7 @@ def test_bot_captures_start_price_even_if_cross_check_marks_composite_stale(tmp_
         recorder_path=tmp_path / "events.jsonl",
         kill_switch_file=tmp_path / "KILL_SWITCH",
     )
-    bot = PolymarketBtc15Bot(
+    bot = PolyEdgeBot(
         settings,
         execution_client=PaperExecutionClient(),
         recorder=JsonlRecorder(settings.recorder_path),
@@ -92,7 +92,7 @@ def test_bot_does_not_capture_late_start_price(tmp_path) -> None:
         kill_switch_file=tmp_path / "KILL_SWITCH",
         start_price_capture_grace_seconds=5,
     )
-    bot = PolymarketBtc15Bot(
+    bot = PolyEdgeBot(
         settings,
         execution_client=PaperExecutionClient(),
         recorder=JsonlRecorder(settings.recorder_path),

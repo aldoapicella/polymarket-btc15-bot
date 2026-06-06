@@ -116,17 +116,15 @@ jobs:
       - name: Verify active writer configuration
         run: |
           app="${{ steps.deploy_outputs.outputs.container_app_name }}"
-          run_on_startup=$(az containerapp show \
+          az containerapp show \
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --name "$app" \
-            --query "properties.template.containers[?name=='bot'].env[?name=='RUN_BOT_ON_STARTUP'].value | [0]" \
-            -o tsv)
-          backend_base=$(az containerapp show \
-            --resource-group "$AZURE_RESOURCE_GROUP" \
-            --name "$app" \
-            --query "properties.template.containers[?name=='frontend'].env[?name=='BACKEND_API_BASE_URL'].value | [0]" \
-            -o tsv)
+            -o json > containerapp.json
+          run_on_startup=$(jq -r '.properties.template.containers[] | select(.name == "bot") | .env[] | select(.name == "RUN_BOT_ON_STARTUP") | .value' containerapp.json)
+          azure_client_id=$(jq -r '.properties.template.containers[] | select(.name == "bot") | .env[] | select(.name == "AZURE_CLIENT_ID") | .value' containerapp.json)
+          backend_base=$(jq -r '.properties.template.containers[] | select(.name == "frontend") | .env[] | select(.name == "BACKEND_API_BASE_URL") | .value' containerapp.json)
           test "$run_on_startup" = "true"
+          test -n "$azure_client_id"
           test "$backend_base" = "http://127.0.0.1:8000/api/v1"
 
       - name: Print endpoint

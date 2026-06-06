@@ -4,7 +4,7 @@ targetScope = 'resourceGroup'
 param location string = resourceGroup().location
 
 @description('Short app name used for resource names.')
-param appName string = 'polymarket-btc15'
+param appName string = 'polyedge'
 
 @description('Backend container image to run. The workflow deploys the current image first, then updates to the built image.')
 param image string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
@@ -22,6 +22,9 @@ param minReplicas int = 1
 @description('Maximum replicas. Keep 1 to avoid duplicate bot collectors.')
 param maxReplicas int = 1
 
+@description('Whether the backend starts the market data writer on startup. Set false for standby migration stacks to avoid duplicate writes.')
+param runBotOnStartup bool = true
+
 @description('Container CPU allocation.')
 param cpu string = '0.5'
 
@@ -33,6 +36,15 @@ param frontendCpu string = '0.5'
 
 @description('Frontend container memory allocation.')
 param frontendMemory string = '1Gi'
+
+@description('Backend API base URL used by the frontend server proxy.')
+param frontendBackendApiBaseUrl string = 'http://127.0.0.1:8000/api/v1'
+
+@description('Backend WebSocket URL used by the frontend realtime proxy when BACKEND_SSE_URL is not set.')
+param frontendBackendWsUrl string = 'ws://127.0.0.1:8000/api/v1/ws/live'
+
+@description('Optional upstream Server-Sent Events URL used by standby frontends to mirror an existing active stack without running a second bot.')
+param frontendBackendSseUrl string = ''
 
 @description('Deployment environment tag.')
 param environmentName string = 'dev'
@@ -46,6 +58,7 @@ var containerAppName = '${appName}-${environmentName}'
 var storageContainerName = 'bot-events'
 var storageTableName = 'BotEventIndex'
 var frontendEnabled = !empty(frontendImage)
+var containerAppIdentityName = '${containerAppName}-id'
 var tags = {
   app: appName
   environment: environmentName
@@ -112,12 +125,21 @@ resource managedEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' = {
   properties: {}
 }
 
+resource containerAppIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+  name: containerAppIdentityName
+  location: location
+  tags: tags
+}
+
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: containerAppName
   location: location
   tags: tags
   identity: {
-    type: 'SystemAssigned'
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${containerAppIdentity.id}': {}
+    }
   }
   properties: {
     managedEnvironmentId: managedEnvironment.id
@@ -138,7 +160,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
       registries: [
         {
           server: acr.properties.loginServer
-          identity: 'system'
+          identity: containerAppIdentity.id
         }
       ]
     }
@@ -162,7 +184,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'RUN_BOT_ON_STARTUP'
-              value: 'true'
+              value: runBotOnStartup ? 'true' : 'false'
             }
             {
               name: 'REQUIRE_API_AUTH'
@@ -242,24 +264,29 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
         {
           name: 'frontend'
           image: frontendImage
-          env: [
+          env: concat([
             {
               name: 'NODE_ENV'
               value: 'production'
             }
             {
               name: 'BACKEND_API_BASE_URL'
-              value: 'http://127.0.0.1:8000/api/v1'
+              value: frontendBackendApiBaseUrl
             }
             {
               name: 'BACKEND_WS_URL'
-              value: 'ws://127.0.0.1:8000/api/v1/ws/live'
+              value: frontendBackendWsUrl
             }
             {
               name: 'BACKEND_API_BEARER_TOKEN'
               secretRef: 'api-bearer-token'
             }
-          ]
+          ], !empty(frontendBackendSseUrl) ? [
+            {
+              name: 'BACKEND_SSE_URL'
+              value: frontendBackendSseUrl
+            }
+          ] : [])
           resources: {
             cpu: json(frontendCpu)
             memory: frontendMemory
@@ -275,31 +302,31 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
 }
 
 resource blobDataContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(storage.id, containerApp.id, 'blob-data-contributor')
+  name: guid(storage.id, containerAppIdentity.id, 'blob-data-contributor')
   scope: storage
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
-    principalId: containerApp.identity.principalId
+    principalId: containerAppIdentity.properties.principalId
     principalType: 'ServicePrincipal'
   }
 }
 
 resource tableDataContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(storage.id, containerApp.id, 'table-data-contributor')
+  name: guid(storage.id, containerAppIdentity.id, 'table-data-contributor')
   scope: storage
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3')
-    principalId: containerApp.identity.principalId
+    principalId: containerAppIdentity.properties.principalId
     principalType: 'ServicePrincipal'
   }
 }
 
 resource acrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(acr.id, containerApp.id, 'acr-pull')
+  name: guid(acr.id, containerAppIdentity.id, 'acr-pull')
   scope: acr
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
-    principalId: containerApp.identity.principalId
+    principalId: containerAppIdentity.properties.principalId
     principalType: 'ServicePrincipal'
   }
 }
@@ -308,6 +335,7 @@ output acrName string = acr.name
 output acrLoginServer string = acr.properties.loginServer
 output containerAppName string = containerApp.name
 output containerAppFqdn string = containerApp.properties.configuration.ingress.fqdn
+output containerAppIdentityName string = containerAppIdentity.name
 output storageAccountName string = storage.name
 output storageContainerName string = storageContainerName
 output storageTableName string = storageTableName

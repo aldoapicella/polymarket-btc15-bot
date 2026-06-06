@@ -1,4 +1,4 @@
-name: Deploy to Azure
+name: Deploy PolyEdge Standby to Azure
 
 on:
   workflow_dispatch:
@@ -8,10 +8,9 @@ permissions:
   id-token: write
 
 env:
-  AZURE_RESOURCE_GROUP: rg-polymarket-btc15-dev
+  AZURE_RESOURCE_GROUP: rg-polyedge-dev
   AZURE_LOCATION: eastus
-  APP_NAME: polymarket-btc15
-  GITHUB_DEPLOY_IDENTITY_NAME: id-github-polymarket-btc15-dev
+  APP_NAME: polyedge
 
 jobs:
   deploy:
@@ -60,35 +59,21 @@ jobs:
             --name "$AZURE_RESOURCE_GROUP" \
             --location "$AZURE_LOCATION"
 
-      - name: Resolve current backend image
-        id: current_backend_image
-        run: |
-          container_app_name="$APP_NAME-dev"
-          image=$(az containerapp show \
-            --resource-group "$AZURE_RESOURCE_GROUP" \
-            --name "$container_app_name" \
-            --query "properties.template.containers[?name=='bot'].image | [0]" \
-            -o tsv 2>/dev/null || true)
-          if [ -z "$image" ]; then
-            image="mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
-          fi
-          echo "image=$image" >> "$GITHUB_OUTPUT"
-
-      - name: Bootstrap infrastructure
+      - name: Bootstrap standby infrastructure
         run: |
           az deployment group create \
-            --name "$APP_NAME-infra" \
+            --name "$APP_NAME-standby-infra" \
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --template-file infra/main.bicep \
-            --parameters infra/parameters/dev.bicepparam \
-            --parameters appName="$APP_NAME" image="${{ steps.current_backend_image.outputs.image }}" apiBearerToken="${{ secrets.API_BEARER_TOKEN }}"
+            --parameters infra/parameters/polyedge-standby.bicepparam \
+            --parameters image="mcr.microsoft.com/azuredocs/containerapps-helloworld:latest" minReplicas=0 apiBearerToken="${{ secrets.API_BEARER_TOKEN }}"
 
       - name: Read deployment outputs
         id: deploy_outputs
         run: |
           outputs=$(az deployment group show \
             --resource-group "$AZURE_RESOURCE_GROUP" \
-            --name "$APP_NAME-infra" \
+            --name "$APP_NAME-standby-infra" \
             --query properties.outputs)
           echo "acr_name=$(echo "$outputs" | jq -r '.acrName.value')" >> "$GITHUB_OUTPUT"
           echo "acr_login_server=$(echo "$outputs" | jq -r '.acrLoginServer.value')" >> "$GITHUB_OUTPUT"
@@ -97,11 +82,7 @@ jobs:
 
       - name: Grant workflow ACR push
         run: |
-          principal_id=$(az identity show \
-            --resource-group "$AZURE_RESOURCE_GROUP" \
-            --name "$GITHUB_DEPLOY_IDENTITY_NAME" \
-            --query principalId \
-            -o tsv)
+          principal_id=$(az ad sp show --id "${{ secrets.AZURE_CLIENT_ID }}" --query id -o tsv)
           acr_id=$(az acr show \
             --name "${{ steps.deploy_outputs.outputs.acr_name }}" \
             --query id \
@@ -125,14 +106,23 @@ jobs:
           echo "BACKEND_IMAGE=$backend_image" >> "$GITHUB_ENV"
           echo "FRONTEND_IMAGE=$frontend_image" >> "$GITHUB_ENV"
 
-      - name: Deploy application images
+      - name: Deploy standby images
         run: |
           az deployment group create \
-            --name "$APP_NAME-infra" \
+            --name "$APP_NAME-standby-infra" \
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --template-file infra/main.bicep \
-            --parameters infra/parameters/dev.bicepparam \
-            --parameters appName="$APP_NAME" image="$BACKEND_IMAGE" frontendImage="$FRONTEND_IMAGE" apiBearerToken="${{ secrets.API_BEARER_TOKEN }}"
+            --parameters infra/parameters/polyedge-standby.bicepparam \
+            --parameters image="$BACKEND_IMAGE" frontendImage="$FRONTEND_IMAGE" apiBearerToken="${{ secrets.API_BEARER_TOKEN }}"
+
+      - name: Verify standby is not a writer
+        run: |
+          run_on_startup=$(az containerapp show \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "${{ steps.deploy_outputs.outputs.container_app_name }}" \
+            --query "properties.template.containers[?name=='bot'].env[?name=='RUN_BOT_ON_STARTUP'].value | [0]" \
+            -o tsv)
+          test "$run_on_startup" = "false"
 
       - name: Print endpoint
         run: |

@@ -5,6 +5,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  if (process.env.BACKEND_SSE_URL) {
+    return proxySse(process.env.BACKEND_SSE_URL);
+  }
+
   const encoder = new TextEncoder();
   let ws: WebSocket | null = null;
   let heartbeat: ReturnType<typeof setInterval> | null = null;
@@ -76,6 +80,45 @@ export async function GET() {
       Connection: "keep-alive"
     }
   });
+}
+
+async function proxySse(sseUrl: string) {
+  const headers = new Headers();
+  const token = process.env.BACKEND_API_BEARER_TOKEN;
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  try {
+    const response = await fetch(sseUrl, {
+      headers,
+      cache: "no-store"
+    });
+    if (!response.ok || !response.body) {
+      return NextResponse.json(
+        {
+          detail: "Backend realtime stream is unavailable.",
+          status: response.status
+        },
+        { status: 502 }
+      );
+    }
+    return new NextResponse(response.body, {
+      headers: {
+        "Content-Type": response.headers.get("content-type") ?? "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive"
+      }
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        detail: "Backend realtime stream is unavailable.",
+        error: error instanceof Error ? error.message : String(error)
+      },
+      { status: 502 }
+    );
+  }
 }
 
 function backendWebSocketUrl() {

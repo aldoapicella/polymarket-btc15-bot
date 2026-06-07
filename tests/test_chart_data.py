@@ -290,6 +290,35 @@ def test_historical_market_endpoint_falls_back_to_raw_outcome_prices(tmp_path) -
     assert market_payload["chart_summary"]["sample_count"] == 0
 
 
+def test_market_detail_overlays_historical_summary_for_bot_memory_market(tmp_path) -> None:
+    settings = _settings(tmp_path)
+    app = create_app(settings)
+    start = datetime(2026, 6, 6, 20, 0, tzinfo=timezone.utc)
+    market = _market(start).model_copy(update={"market_id": "memory-m1"})
+    app.state.bot.markets[market.market_id] = market
+    app.state.chart_data_store.record_market(market)
+    app.state.chart_data_store.record_fair_value(
+        FairValue(
+            market_id=market.market_id,
+            q_up=Decimal("0.66"),
+            q_down=Decimal("0.34"),
+            sigma=0.5,
+            drift_mu=0.0,
+            model_error=Decimal("0.01"),
+            computed_ts=start + timedelta(minutes=5),
+        )
+    )
+    app.state.chart_service.hydrate_market_summaries()
+
+    response = TestClient(app).get("/api/v1/markets/memory-m1")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["fair_value"]["q_up"] == "0.66"
+    assert payload["market"]["fair_value"]["q_down"] == "0.34"
+    assert payload["market"]["chart_summary"]["sample_count"] == 1
+
+
 def test_chart_backfill_endpoint_runs_as_job(tmp_path) -> None:
     settings = _settings(tmp_path)
     settings.recorder_path.write_text(

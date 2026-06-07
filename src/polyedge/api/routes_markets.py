@@ -45,6 +45,9 @@ async def market_detail(
 ) -> dict[str, Any]:
     market = snapshot_service.market_detail(market_id)
     if market is not None:
+        historical_market = chart_service.get_market(market_id)
+        if historical_market is not None:
+            market = _merge_historical_market_payload(market, chart_service.market_payload(historical_market))
         return market
     historical_market = chart_service.get_market(market_id)
     if historical_market is None:
@@ -211,3 +214,21 @@ async def _evaluate(bot: PolyEdgeBot, execute: bool) -> dict[str, Any]:
         "count": len(emitted),
         "decisions": [decision.model_dump(mode="json") for decision in emitted],
     }
+
+
+def _merge_historical_market_payload(detail: dict[str, Any], historical_market: dict[str, Any]) -> dict[str, Any]:
+    current_market = detail.get("market")
+    if not isinstance(current_market, dict):
+        return detail
+    merged_market = {**current_market}
+    for key in ("start_price", "status", "is_active", "is_tradeable", "chart_summary"):
+        value = historical_market.get(key)
+        if value is not None:
+            merged_market[key] = value
+    historical_fair_value = historical_market.get("fair_value")
+    if detail.get("fair_value") is None and historical_fair_value is not None:
+        detail = {**detail, "fair_value": historical_fair_value}
+        merged_market["fair_value"] = historical_fair_value
+    elif current_market.get("fair_value") is None and historical_fair_value is not None:
+        merged_market["fair_value"] = historical_fair_value
+    return {**detail, "market": merged_market}

@@ -11,7 +11,7 @@ from ..reports import ReportJobManager
 from ..runtime.chart_data import build_chart_data_store
 from ..runtime.event_bus import RuntimeEventBus
 from ..services.audit import AuditLog
-from ..services.chart_service import ChartService
+from ..services.chart_service import ChartBackfillJobManager, ChartService
 from ..services.config_service import RuntimeConfigService
 from ..services.event_service import EventService
 from ..services.snapshot import SnapshotService
@@ -35,6 +35,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     snapshot_service = SnapshotService(bot, report_jobs)
     event_service = EventService(config)
     chart_service = ChartService(config, chart_data_store)
+    chart_backfill_jobs = ChartBackfillJobManager(chart_service)
     audit_log = AuditLog(config)
     config_service = RuntimeConfigService(config, audit_log, event_bus)
 
@@ -59,6 +60,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.snapshot_service = snapshot_service
     app.state.event_service = event_service
     app.state.chart_service = chart_service
+    app.state.chart_backfill_jobs = chart_backfill_jobs
     app.state.audit_log = audit_log
     app.state.config_service = config_service
     app.state.event_bus = event_bus

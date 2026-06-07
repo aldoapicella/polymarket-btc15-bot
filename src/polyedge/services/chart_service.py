@@ -1,16 +1,109 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Iterable, Literal
+from uuid import uuid4
 
 from ..config import Settings
 from ..models import BookLevel, BookState, ExecutionReport, FairValue, MarketSpec, MarketStatus, ReferencePrice
 from ..runtime.chart_data import ChartDataStore, ChartRange
 
 ChartBackfillSource = Literal["auto", "local", "azure"]
+
+
+class ChartBackfillJobAlreadyRunning(RuntimeError):
+    def __init__(self, status: dict[str, Any]):
+        super().__init__("A chart backfill job is already running")
+        self.status = status
+
+
+class ChartBackfillJobManager:
+    def __init__(self, chart_service: ChartService):
+        self.chart_service = chart_service
+        self._jobs: dict[str, dict[str, Any]] = {}
+        self._lock = asyncio.Lock()
+        self._running_task: asyncio.Task[None] | None = None
+        self._running_job_id: str | None = None
+
+    async def start(
+        self,
+        *,
+        source: ChartBackfillSource = "auto",
+        prefix: str | None = None,
+        report_date: date | None = None,
+    ) -> dict[str, Any]:
+        async with self._lock:
+            if self._running_task is not None and not self._running_task.done():
+                current = self._jobs.get(self._running_job_id or "")
+                raise ChartBackfillJobAlreadyRunning(current or {"status": "running"})
+            job = {
+                "job_id": f"chart-backfill-{uuid4().hex}",
+                "status": "queued",
+                "source": source,
+                "prefix": prefix,
+                "date": report_date.isoformat() if report_date else None,
+                "created_ts": _now_iso(),
+                "started_ts": None,
+                "finished_ts": None,
+                "error": None,
+                "summary": None,
+            }
+            self._jobs[job["job_id"]] = job
+            self._running_job_id = job["job_id"]
+            self._running_task = asyncio.create_task(
+                self._run(job["job_id"], source, prefix, report_date),
+                name=f"chart-backfill-{job['job_id']}",
+            )
+            return job
+
+    async def get(self, job_id: str) -> dict[str, Any] | None:
+        return self._jobs.get(job_id)
+
+    def status(self) -> dict[str, Any]:
+        running = self._jobs.get(self._running_job_id or "")
+        return {
+            "running_job": running if running and running.get("status") == "running" else None,
+            "known_jobs": len(self._jobs),
+        }
+
+    async def _run(
+        self,
+        job_id: str,
+        source: ChartBackfillSource,
+        prefix: str | None,
+        report_date: date | None,
+    ) -> None:
+        job = self._jobs[job_id]
+        job["status"] = "running"
+        job["started_ts"] = _now_iso()
+        try:
+            summary = await asyncio.to_thread(
+                self.chart_service.backfill,
+                source=source,
+                prefix=prefix,
+                report_date=report_date,
+            )
+        except Exception as exc:
+            job.update(
+                {
+                    "status": "failed",
+                    "finished_ts": _now_iso(),
+                    "error": str(exc),
+                }
+            )
+            return
+        job.update(
+            {
+                "status": "completed",
+                "finished_ts": _now_iso(),
+                "summary": summary,
+                "error": None,
+            }
+        )
 
 
 class ChartService:
@@ -343,3 +436,7 @@ def _resolved_prefix(prefix: str | None, report_date: date | None, source: Liter
     if report_date:
         return f"events/{report_date:%Y/%m/%d}/"
     return "events/"
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()

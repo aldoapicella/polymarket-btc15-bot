@@ -9,7 +9,7 @@ from ..reports import ReportJobManager
 from ..runtime.chart_data import ChartDataStore
 from ..runtime.event_bus import RuntimeEventBus
 from ..services.audit import AuditLog
-from ..services.chart_service import ChartService
+from ..services.chart_service import ChartBackfillJobManager, ChartService
 from ..services.config_service import RuntimeConfigService
 from ..services.event_service import EventService
 from ..services.snapshot import SnapshotService
@@ -53,6 +53,10 @@ def get_chart_data_store(request: Request) -> ChartDataStore:
 
 def get_chart_service(request: Request) -> ChartService:
     return request.app.state.chart_service
+
+
+def get_chart_backfill_jobs(request: Request) -> ChartBackfillJobManager:
+    return request.app.state.chart_backfill_jobs
 
 
 async def require_auth(

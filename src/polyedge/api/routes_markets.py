@@ -1,17 +1,16 @@
 from __future__ import annotations
 
-import asyncio
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi import status as http_status
 
 from ..bot import PolyEdgeBot
-from ..services.chart_service import ChartService
+from ..services.chart_service import ChartBackfillJobAlreadyRunning, ChartBackfillJobManager, ChartService
 from ..services.event_service import EventService
 from ..services.snapshot import SnapshotService
 from ..source_confirmation import confirm_source
-from .deps import get_bot, get_chart_service, get_event_service, get_settings, get_snapshot_service, require_auth
+from .deps import get_bot, get_chart_backfill_jobs, get_chart_service, get_event_service, get_settings, get_snapshot_service, require_auth
 from .schemas import ChartBackfillApiRequest
 from ..config import Settings
 
@@ -81,14 +80,40 @@ async def market_chart(
 @router.post("/charts/backfill")
 async def backfill_charts(
     request: ChartBackfillApiRequest,
-    chart_service: ChartService = Depends(get_chart_service),
+    chart_backfill_jobs: ChartBackfillJobManager = Depends(get_chart_backfill_jobs),
 ) -> dict[str, Any]:
-    return await asyncio.to_thread(
-        chart_service.backfill,
-        source=request.source,
-        prefix=request.prefix,
-        report_date=request.report_date,
-    )
+    try:
+        return await chart_backfill_jobs.start(
+            source=request.source,
+            prefix=request.prefix,
+            report_date=request.report_date,
+        )
+    except ChartBackfillJobAlreadyRunning as exc:
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail=exc.status,
+        ) from exc
+
+
+@router.get("/charts/backfill/{job_id}")
+async def backfill_chart_job(
+    job_id: str,
+    chart_backfill_jobs: ChartBackfillJobManager = Depends(get_chart_backfill_jobs),
+) -> dict[str, Any]:
+    job = await chart_backfill_jobs.get(job_id)
+    if job is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail=f"Chart backfill job {job_id} was not found.",
+        )
+    return job
+
+
+@router.get("/charts/backfill")
+async def backfill_chart_status(
+    chart_backfill_jobs: ChartBackfillJobManager = Depends(get_chart_backfill_jobs),
+) -> dict[str, Any]:
+    return chart_backfill_jobs.status()
 
 
 @router.get("/orders")

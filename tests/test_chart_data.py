@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+import time
 
 from fastapi.testclient import TestClient
 
@@ -225,6 +226,41 @@ def test_historical_market_endpoint_uses_backfilled_catalog(tmp_path) -> None:
 
     assert response.status_code == 200
     assert response.json()["markets"][0]["market_id"] == "old-m2"
+
+
+def test_chart_backfill_endpoint_runs_as_job(tmp_path) -> None:
+    settings = _settings(tmp_path)
+    settings.recorder_path.write_text(
+        _event(
+            "2026-06-06T20:00:00+00:00",
+            "market",
+            {
+                "market_id": "job-m1",
+                "condition_id": "job-c1",
+                "question": "Bitcoin Up or Down",
+                "up_token_id": "job-up",
+                "down_token_id": "job-down",
+                "start_ts": "2026-06-06T20:00:00Z",
+                "end_ts": "2026-06-06T20:15:00Z",
+                "start_price": "100",
+            },
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    with TestClient(create_app(settings)) as client:
+        response = client.post("/api/v1/charts/backfill", json={"source": "local"})
+
+        assert response.status_code == 200
+        job = response.json()
+        assert job["job_id"].startswith("chart-backfill-")
+        for _ in range(20):
+            current = client.get(f"/api/v1/charts/backfill/{job['job_id']}").json()
+            if current["status"] == "completed":
+                break
+            time.sleep(0.05)
+        assert current["status"] == "completed"
+        assert current["summary"]["markets_persisted"] == 1
 
 
 def _event(recorded_ts: str, event_type: str, payload: dict) -> str:

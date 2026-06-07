@@ -643,7 +643,7 @@ def _sample_to_entity(sample: ChartSample) -> dict[str, Any]:
         "PartitionKey": _partition_key(sample.market_id),
         "RowKey": _row_key(sample.bucket),
         "marketId": sample.market_id,
-        "bucket": sample.bucket,
+        "bucket": str(sample.bucket),
         "bucketTs": sample.bucket_ts,
     }
     for key in _CHART_FIELDS:

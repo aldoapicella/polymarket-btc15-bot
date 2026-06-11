@@ -207,18 +207,13 @@ pub enum DecisionAction {
     Hold,
 }
 
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MarketStatus {
     Tradeable,
+    #[default]
     ObserveOnly,
     Closed,
-}
-
-impl Default for MarketStatus {
-    fn default() -> Self {
-        Self::ObserveOnly
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

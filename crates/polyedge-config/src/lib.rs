@@ -13,17 +13,12 @@ pub enum ConfigError {
     InvalidDecimal { name: String, value: String },
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecutionMode {
+    #[default]
     Paper,
     Live,
-}
-
-impl Default for ExecutionMode {
-    fn default() -> Self {
-        Self::Paper
-    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

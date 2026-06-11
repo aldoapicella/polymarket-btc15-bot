@@ -1,0 +1,669 @@
+{
+  "fair_value_cases": [
+    {
+      "expected": {
+        "computed_ts": "2026-06-01T22:01:00Z",
+        "drift_mu": 0.0,
+        "market_id": "m1",
+        "model_error": "0.01",
+        "q_down": "0.053629",
+        "q_up": "0.946371",
+        "sigma": 0.6
+      },
+      "market": {
+        "accepting_orders": true,
+        "asset": "BTC",
+        "condition_id": "c1",
+        "description": null,
+        "down_token_id": "down",
+        "end_ts": "2026-06-01T22:15:00Z",
+        "event_id": null,
+        "event_slug": null,
+        "fees_enabled": true,
+        "horizon": "15m",
+        "market_id": "m1",
+        "market_slug": null,
+        "minimum_order_size": "5",
+        "neg_risk": false,
+        "question": "Bitcoin Up or Down 15m",
+        "raw": {},
+        "resolution_source": "chainlink_reference",
+        "start_price": "100000",
+        "start_ts": "2026-06-01T22:00:00Z",
+        "status": "tradeable",
+        "tick_size": "0.01",
+        "up_token_id": "up"
+      },
+      "name": "reference_above_start",
+      "now": "2026-06-01T22:01:00+00:00",
+      "reference": {
+        "exact_resolution_source": false,
+        "latency_ms": 0.0,
+        "local_ts": "2026-06-01T22:01:00Z",
+        "price": "100500",
+        "quality_flags": [],
+        "source": "test",
+        "source_ts": "2026-06-01T22:01:00Z",
+        "stale": false
+      },
+      "settings": {
+        "adverse_selection_buffer": "0.005",
+        "allow_live": false,
+        "base_order_size": "5",
+        "confirm_non_restricted_location": false,
+        "drift_mu": 0.0,
+        "enable_taker_orders": false,
+        "ewma_lambda": 0.94,
+        "execution_mode": "paper",
+        "final_no_trade_seconds": 30,
+        "maker_margin": "0.015",
+        "maker_min_edge": "0.01",
+        "max_book_age_ms": 1500,
+        "max_daily_loss": "50",
+        "max_open_orders": 8,
+        "max_order_size": "5",
+        "max_position_per_market": "25",
+        "max_reference_age_ms": 1500,
+        "max_total_position": "100",
+        "model_error_buffer": "0.01",
+        "order_ttl_seconds": 10,
+        "paper_maker_fill_policy": "touch_after_quote_was_live",
+        "paper_order_live_after_ms": 250,
+        "polymarket_private_key_configured": false,
+        "require_exact_resolution_source_for_live": true,
+        "sigma_cap": 3.0,
+        "sigma_floor": 0.2,
+        "slippage_buffer": "0.002",
+        "taker_min_edge": "0.03"
+      },
+      "sigma": 0.6
+    }
+  ],
+  "order_manager_cases": [
+    {
+      "decisions": [
+        {
+          "action": "place",
+          "condition_id": null,
+          "expected_edge": null,
+          "market_id": "m1",
+          "neg_risk": false,
+          "order_kind": "post_only_gtc",
+          "outcome": null,
+          "post_only": true,
+          "price": "0.51",
+          "quote_amount": null,
+          "reason": "maker edge",
+          "side": "buy",
+          "size": "5",
+          "tick_size": null,
+          "token_id": "up",
+          "ttl_ms": 1000
+        }
+      ],
+      "expected": [
+        {
+          "action": "place",
+          "condition_id": null,
+          "expected_edge": null,
+          "market_id": "m1",
+          "neg_risk": false,
+          "order_kind": "post_only_gtc",
+          "outcome": null,
+          "post_only": true,
+          "price": "0.51",
+          "quote_amount": null,
+          "reason": "maker edge",
+          "side": "buy",
+          "size": "5",
+          "tick_size": null,
+          "token_id": "up",
+          "ttl_ms": 1000
+        }
+      ],
+      "market_id": "m1",
+      "name": "places_initial_maker_quote",
+      "now": "2026-06-01T22:01:00+00:00"
+    }
+  ],
+  "paper_fill_cases": [
+    {
+      "book": {
+        "asks": [
+          {
+            "price": "0.50",
+            "size": "5"
+          }
+        ],
+        "bids": [
+          {
+            "price": "0.49",
+            "size": "100"
+          }
+        ],
+        "book_hash": null,
+        "exchange_ts": null,
+        "last_trade_price": null,
+        "local_ts": "2099-01-01T00:00:01Z",
+        "token_id": "up"
+      },
+      "current_time": "2099-01-01T00:00:01+00:00",
+      "expected": [
+        {
+          "avg_price": "0.50",
+          "fee": "0",
+          "filled_size": "5",
+          "local_ts": "2099-01-01T00:00:01Z",
+          "market_id": "m1",
+          "order_id": "paper-fixture-1",
+          "raw": {
+            "decision": {
+              "action": "place",
+              "condition_id": "c1",
+              "expected_edge": null,
+              "market_id": "m1",
+              "neg_risk": false,
+              "order_kind": "post_only_gtc",
+              "outcome": null,
+              "post_only": true,
+              "price": "0.50",
+              "quote_amount": null,
+              "reason": "test maker quote",
+              "side": "buy",
+              "size": "5",
+              "tick_size": null,
+              "token_id": "up",
+              "ttl_ms": 10000
+            }
+          },
+          "status": "paper_filled_maker",
+          "token_id": "up"
+        }
+      ],
+      "expected_status": {
+        "paper_fill_policy": "touch_after_quote_was_live",
+        "paper_fill_prevented_after_cancel": 0,
+        "paper_fill_prevented_expired": 0,
+        "paper_fill_prevented_final_window": 0,
+        "paper_fill_prevented_market_inactive": 0,
+        "paper_fill_prevented_not_live": 0,
+        "paper_fill_prevented_stale_book": 0,
+        "paper_fill_prevented_untracked_order": 0,
+        "paper_last_fill_ts": "2099-01-01T00:00:01+00:00",
+        "paper_maker_fills": 1,
+        "paper_open_resting_orders": 0,
+        "paper_order_live_after_ms": 250
+      },
+      "market_by_token": {
+        "up": {
+          "accepting_orders": true,
+          "asset": "BTC",
+          "condition_id": "c1",
+          "description": null,
+          "down_token_id": "down",
+          "end_ts": "2099-01-01T00:14:01Z",
+          "event_id": null,
+          "event_slug": null,
+          "fees_enabled": true,
+          "horizon": "15m",
+          "market_id": "m1",
+          "market_slug": null,
+          "minimum_order_size": "5",
+          "neg_risk": false,
+          "question": "Bitcoin Up or Down 15m",
+          "raw": {},
+          "resolution_source": "chainlink_reference",
+          "start_price": "100000",
+          "start_ts": "2098-12-31T23:59:01Z",
+          "status": "tradeable",
+          "tick_size": "0.01",
+          "up_token_id": "up"
+        }
+      },
+      "name": "maker_touch_after_order_live",
+      "resting_order": {
+        "decision": {
+          "action": "place",
+          "condition_id": "c1",
+          "expected_edge": null,
+          "market_id": "m1",
+          "neg_risk": false,
+          "order_kind": "post_only_gtc",
+          "outcome": null,
+          "post_only": true,
+          "price": "0.50",
+          "quote_amount": null,
+          "reason": "test maker quote",
+          "side": "buy",
+          "size": "5",
+          "tick_size": null,
+          "token_id": "up",
+          "ttl_ms": 10000
+        },
+        "order_id": "paper-fixture-1",
+        "report": {
+          "avg_price": null,
+          "fee": "0",
+          "filled_size": "0",
+          "local_ts": "2099-01-01T00:00:00.749000Z",
+          "market_id": "m1",
+          "order_id": "paper-fixture-1",
+          "raw": {
+            "decision": {
+              "action": "place",
+              "condition_id": "c1",
+              "expected_edge": null,
+              "market_id": "m1",
+              "neg_risk": false,
+              "order_kind": "post_only_gtc",
+              "outcome": null,
+              "post_only": true,
+              "price": "0.50",
+              "quote_amount": null,
+              "reason": "test maker quote",
+              "side": "buy",
+              "size": "5",
+              "tick_size": null,
+              "token_id": "up",
+              "ttl_ms": 10000
+            }
+          },
+          "status": "paper_resting",
+          "token_id": "up"
+        }
+      },
+      "settings": {
+        "adverse_selection_buffer": "0.005",
+        "allow_live": false,
+        "base_order_size": "5",
+        "confirm_non_restricted_location": false,
+        "drift_mu": 0.0,
+        "enable_taker_orders": false,
+        "ewma_lambda": 0.94,
+        "execution_mode": "paper",
+        "final_no_trade_seconds": 30,
+        "maker_margin": "0.015",
+        "maker_min_edge": "0.01",
+        "max_book_age_ms": 86400000,
+        "max_daily_loss": "50",
+        "max_open_orders": 8,
+        "max_order_size": "5",
+        "max_position_per_market": "25",
+        "max_reference_age_ms": 1500,
+        "max_total_position": "100",
+        "model_error_buffer": "0.01",
+        "order_ttl_seconds": 10,
+        "paper_maker_fill_policy": "touch_after_quote_was_live",
+        "paper_order_live_after_ms": 250,
+        "polymarket_private_key_configured": false,
+        "require_exact_resolution_source_for_live": true,
+        "sigma_cap": 3.0,
+        "sigma_floor": 0.2,
+        "slippage_buffer": "0.002",
+        "taker_min_edge": "0.03"
+      },
+      "tracked_order_ids": [
+        "paper-fixture-1"
+      ]
+    }
+  ],
+  "risk_cases": [
+    {
+      "books": {
+        "down": {
+          "asks": [
+            {
+              "price": "0.47",
+              "size": "100"
+            }
+          ],
+          "bids": [
+            {
+              "price": "0.45",
+              "size": "100"
+            }
+          ],
+          "book_hash": null,
+          "exchange_ts": null,
+          "last_trade_price": null,
+          "local_ts": "2026-06-01T22:01:00Z",
+          "token_id": "down"
+        },
+        "up": {
+          "asks": [
+            {
+              "price": "0.53",
+              "size": "100"
+            }
+          ],
+          "bids": [
+            {
+              "price": "0.50",
+              "size": "100"
+            }
+          ],
+          "book_hash": null,
+          "exchange_ts": null,
+          "last_trade_price": null,
+          "local_ts": "2026-06-01T22:01:00Z",
+          "token_id": "up"
+        }
+      },
+      "expected": {
+        "allowed": true,
+        "reasons": []
+      },
+      "market": {
+        "accepting_orders": true,
+        "asset": "BTC",
+        "condition_id": "c1",
+        "description": null,
+        "down_token_id": "down",
+        "end_ts": "2026-06-01T22:15:00Z",
+        "event_id": null,
+        "event_slug": null,
+        "fees_enabled": true,
+        "horizon": "15m",
+        "market_id": "m1",
+        "market_slug": null,
+        "minimum_order_size": "5",
+        "neg_risk": false,
+        "question": "Bitcoin Up or Down 15m",
+        "raw": {},
+        "resolution_source": "chainlink_reference",
+        "start_price": "100000",
+        "start_ts": "2026-06-01T22:00:00Z",
+        "status": "tradeable",
+        "tick_size": "0.01",
+        "up_token_id": "up"
+      },
+      "name": "paper_allows_proxy_reference",
+      "now": "2026-06-01T22:01:00+00:00",
+      "reference": {
+        "exact_resolution_source": false,
+        "latency_ms": 0.0,
+        "local_ts": "2026-06-01T22:01:00Z",
+        "price": "100000",
+        "quality_flags": [],
+        "source": "cex_median_proxy",
+        "source_ts": "2026-06-01T22:01:00Z",
+        "stale": false
+      },
+      "settings": {
+        "adverse_selection_buffer": "0.005",
+        "allow_live": false,
+        "base_order_size": "5",
+        "confirm_non_restricted_location": false,
+        "drift_mu": 0.0,
+        "enable_taker_orders": false,
+        "ewma_lambda": 0.94,
+        "execution_mode": "paper",
+        "final_no_trade_seconds": 30,
+        "maker_margin": "0.015",
+        "maker_min_edge": "0.01",
+        "max_book_age_ms": 1500,
+        "max_daily_loss": "50",
+        "max_open_orders": 8,
+        "max_order_size": "5",
+        "max_position_per_market": "25",
+        "max_reference_age_ms": 1500,
+        "max_total_position": "100",
+        "model_error_buffer": "0.01",
+        "order_ttl_seconds": 10,
+        "paper_maker_fill_policy": "touch_after_quote_was_live",
+        "paper_order_live_after_ms": 250,
+        "polymarket_private_key_configured": false,
+        "require_exact_resolution_source_for_live": true,
+        "sigma_cap": 3.0,
+        "sigma_floor": 0.2,
+        "slippage_buffer": "0.002",
+        "taker_min_edge": "0.03"
+      }
+    },
+    {
+      "books": {
+        "down": {
+          "asks": [
+            {
+              "price": "0.47",
+              "size": "100"
+            }
+          ],
+          "bids": [
+            {
+              "price": "0.45",
+              "size": "100"
+            }
+          ],
+          "book_hash": null,
+          "exchange_ts": null,
+          "last_trade_price": null,
+          "local_ts": "2026-06-01T22:01:00Z",
+          "token_id": "down"
+        },
+        "up": {
+          "asks": [
+            {
+              "price": "0.53",
+              "size": "100"
+            }
+          ],
+          "bids": [
+            {
+              "price": "0.50",
+              "size": "100"
+            }
+          ],
+          "book_hash": null,
+          "exchange_ts": null,
+          "last_trade_price": null,
+          "local_ts": "2026-06-01T22:01:00Z",
+          "token_id": "up"
+        }
+      },
+      "expected": {
+        "allowed": false,
+        "reasons": [
+          "ALLOW_LIVE is false",
+          "non-restricted location not confirmed",
+          "POLYMARKET_PRIVATE_KEY is not configured",
+          "exact Chainlink resolution source unavailable"
+        ]
+      },
+      "market": {
+        "accepting_orders": true,
+        "asset": "BTC",
+        "condition_id": "c1",
+        "description": null,
+        "down_token_id": "down",
+        "end_ts": "2026-06-01T22:15:00Z",
+        "event_id": null,
+        "event_slug": null,
+        "fees_enabled": true,
+        "horizon": "15m",
+        "market_id": "m1",
+        "market_slug": null,
+        "minimum_order_size": "5",
+        "neg_risk": false,
+        "question": "Bitcoin Up or Down 15m",
+        "raw": {},
+        "resolution_source": "chainlink_reference",
+        "start_price": "100000",
+        "start_ts": "2026-06-01T22:00:00Z",
+        "status": "tradeable",
+        "tick_size": "0.01",
+        "up_token_id": "up"
+      },
+      "name": "live_blocks_without_gates",
+      "now": "2026-06-01T22:01:00+00:00",
+      "reference": {
+        "exact_resolution_source": false,
+        "latency_ms": 0.0,
+        "local_ts": "2026-06-01T22:01:00Z",
+        "price": "100000",
+        "quality_flags": [],
+        "source": "cex_median_proxy",
+        "source_ts": "2026-06-01T22:01:00Z",
+        "stale": false
+      },
+      "settings": {
+        "adverse_selection_buffer": "0.005",
+        "allow_live": false,
+        "base_order_size": "5",
+        "confirm_non_restricted_location": false,
+        "drift_mu": 0.0,
+        "enable_taker_orders": false,
+        "ewma_lambda": 0.94,
+        "execution_mode": "live",
+        "final_no_trade_seconds": 30,
+        "maker_margin": "0.015",
+        "maker_min_edge": "0.01",
+        "max_book_age_ms": 1500,
+        "max_daily_loss": "50",
+        "max_open_orders": 8,
+        "max_order_size": "5",
+        "max_position_per_market": "25",
+        "max_reference_age_ms": 1500,
+        "max_total_position": "100",
+        "model_error_buffer": "0.01",
+        "order_ttl_seconds": 10,
+        "paper_maker_fill_policy": "touch_after_quote_was_live",
+        "paper_order_live_after_ms": 250,
+        "polymarket_private_key_configured": false,
+        "require_exact_resolution_source_for_live": true,
+        "sigma_cap": 3.0,
+        "sigma_floor": 0.2,
+        "slippage_buffer": "0.002",
+        "taker_min_edge": "0.03"
+      }
+    }
+  ],
+  "strategy_cases": [
+    {
+      "books": {
+        "down": {
+          "asks": [
+            {
+              "price": "0.47",
+              "size": "100"
+            }
+          ],
+          "bids": [
+            {
+              "price": "0.45",
+              "size": "100"
+            }
+          ],
+          "book_hash": null,
+          "exchange_ts": null,
+          "last_trade_price": null,
+          "local_ts": "2026-06-01T22:01:00Z",
+          "token_id": "down"
+        },
+        "up": {
+          "asks": [
+            {
+              "price": "0.53",
+              "size": "100"
+            }
+          ],
+          "bids": [
+            {
+              "price": "0.50",
+              "size": "100"
+            }
+          ],
+          "book_hash": null,
+          "exchange_ts": null,
+          "last_trade_price": null,
+          "local_ts": "2026-06-01T22:01:00Z",
+          "token_id": "up"
+        }
+      },
+      "expected": [
+        {
+          "action": "place",
+          "condition_id": "c1",
+          "expected_edge": "0.025",
+          "market_id": "m1",
+          "neg_risk": false,
+          "order_kind": "post_only_gtc",
+          "outcome": "up",
+          "post_only": true,
+          "price": "0.51",
+          "quote_amount": null,
+          "reason": "maker edge exceeds threshold",
+          "side": "buy",
+          "size": "5",
+          "tick_size": "0.01",
+          "token_id": "up",
+          "ttl_ms": 10000
+        }
+      ],
+      "fair_value": {
+        "computed_ts": "2026-06-01T22:01:00Z",
+        "drift_mu": 0.0,
+        "market_id": "m1",
+        "model_error": "0.01",
+        "q_down": "0.45",
+        "q_up": "0.55",
+        "sigma": 0.6
+      },
+      "market": {
+        "accepting_orders": true,
+        "asset": "BTC",
+        "condition_id": "c1",
+        "description": null,
+        "down_token_id": "down",
+        "end_ts": "2026-06-01T22:15:00Z",
+        "event_id": null,
+        "event_slug": null,
+        "fees_enabled": true,
+        "horizon": "15m",
+        "market_id": "m1",
+        "market_slug": null,
+        "minimum_order_size": "5",
+        "neg_risk": false,
+        "question": "Bitcoin Up or Down 15m",
+        "raw": {},
+        "resolution_source": "chainlink_reference",
+        "start_price": "100000",
+        "start_ts": "2026-06-01T22:00:00Z",
+        "status": "tradeable",
+        "tick_size": "0.01",
+        "up_token_id": "up"
+      },
+      "name": "maker_bid_one_tick_above_best_bid",
+      "settings": {
+        "adverse_selection_buffer": "0.005",
+        "allow_live": false,
+        "base_order_size": "5",
+        "confirm_non_restricted_location": false,
+        "drift_mu": 0.0,
+        "enable_taker_orders": false,
+        "ewma_lambda": 0.94,
+        "execution_mode": "paper",
+        "final_no_trade_seconds": 30,
+        "maker_margin": "0.015",
+        "maker_min_edge": "0.01",
+        "max_book_age_ms": 1500,
+        "max_daily_loss": "50",
+        "max_open_orders": 8,
+        "max_order_size": "5",
+        "max_position_per_market": "25",
+        "max_reference_age_ms": 1500,
+        "max_total_position": "100",
+        "model_error_buffer": "0.01",
+        "order_ttl_seconds": 10,
+        "paper_maker_fill_policy": "touch_after_quote_was_live",
+        "paper_order_live_after_ms": 250,
+        "polymarket_private_key_configured": false,
+        "require_exact_resolution_source_for_live": true,
+        "sigma_cap": 3.0,
+        "sigma_floor": 0.2,
+        "slippage_buffer": "0.002",
+        "taker_min_edge": "0.03"
+      }
+    }
+  ]
+}

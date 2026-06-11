@@ -1,0 +1,119 @@
+{
+  "actual_paper": {
+    "execution_reports_seen": 1,
+    "fees": "0",
+    "filled_reports": 0,
+    "filled_shares": "0",
+    "gross_pnl": "0",
+    "market_level_statistics": {
+      "confidence_interval_includes_zero": null,
+      "market_level_95ci_high": null,
+      "market_level_95ci_low": null,
+      "market_level_mean_pnl": "0",
+      "market_level_standard_error": null,
+      "market_level_std_pnl": null,
+      "markets_count": 1,
+      "profitability_statistically_proven_95ci": null,
+      "required_markets_for_0_05_precision": null,
+      "required_markets_for_0_10_precision": null,
+      "required_markets_method": "precision uses (1.96 * sample_std / desired_margin)^2; detect_current_mean uses 7.84 * (sample_std / abs(mean_pnl))^2.",
+      "required_markets_to_detect_current_mean": null,
+      "sample_unit": "settled_market_net_pnl"
+    },
+    "meaning": "Runtime paper ledger built only from execution_report events with positive filled_size. Maker fills appear here only when the runtime paper fill engine emits paper_filled_maker.",
+    "net_pnl": "0",
+    "notional_cost": "0",
+    "roi_on_cost": null,
+    "runtime_fill_policy": "unknown",
+    "settled_filled_reports": 0,
+    "status_counts": {
+      "paper_resting": 1
+    }
+  },
+  "replay_estimate": {
+    "assumption": "Post-only maker orders are treated as filled when the captured best ask touches or crosses the quote while the replay order is open. cancel_all decisions remove eligible open replay orders. Replay also enforces the configured quote-live delay, TTL, active-market window, final no-trade window, and stale-book guard. Maker fees are modeled as zero; unsettled markets are excluded from PnL.",
+    "decisions_seen": 1,
+    "event_count": 5,
+    "fees": "0",
+    "filled_orders": 1,
+    "gross_pnl": "2.50",
+    "market_level_statistics": {
+      "confidence_interval_includes_zero": null,
+      "market_level_95ci_high": null,
+      "market_level_95ci_low": null,
+      "market_level_mean_pnl": "2.50",
+      "market_level_standard_error": null,
+      "market_level_std_pnl": null,
+      "markets_count": 1,
+      "profitability_statistically_proven_95ci": null,
+      "required_markets_for_0_05_precision": null,
+      "required_markets_for_0_10_precision": null,
+      "required_markets_method": "precision uses (1.96 * sample_std / desired_margin)^2; detect_current_mean uses 7.84 * (sample_std / abs(mean_pnl))^2.",
+      "required_markets_to_detect_current_mean": null,
+      "sample_unit": "settled_market_net_pnl"
+    },
+    "market_results": [
+      {
+        "end_ts": "2026-06-01T22:15:00+00:00",
+        "fees": "0",
+        "filled_orders": 1,
+        "final_price": "100100",
+        "gross_pnl": "2.50",
+        "market_id": "m1",
+        "market_slug": "btc-updown-15m-m1",
+        "net_pnl": "2.50",
+        "start_price": "100000",
+        "start_ts": "2026-06-01T22:00:00+00:00",
+        "winning_outcome": "up"
+      }
+    ],
+    "markets_seen": 1,
+    "markets_settled": 1,
+    "markets_with_start_price": 1,
+    "meaning": "Offline cancellation-aware replay over recorded market, decision, book, and Chainlink reference events.",
+    "net_pnl": "2.50",
+    "notes": [],
+    "notional_cost": "2.50",
+    "orders_seen": 1,
+    "path": "/mnt/c/Users/aldoa/OneDrive/Documents/Crypto Research and Execution/tests/fixtures/events_pnl_sample.jsonl",
+    "replay_fill_policy": "touch_after_cancel_aware",
+    "replay_metrics": {
+      "cancel_decisions_seen": 0,
+      "cancel_execution_reports_seen": 0,
+      "fills_after_cancel_prevented": 0,
+      "fills_prevented_expired": 0,
+      "fills_prevented_final_window": 0,
+      "fills_prevented_market_inactive": 0,
+      "fills_prevented_not_live": 0,
+      "fills_prevented_stale_book": 0,
+      "open_orders_remaining": 0,
+      "orders_cancelled": 0,
+      "placed_orders": 1
+    }
+  },
+  "runtime_vs_replay": {
+    "replay_filled_orders": 1,
+    "replay_net_pnl": "2.50",
+    "runtime_filled_reports": 0,
+    "runtime_minus_replay_fills": -1,
+    "runtime_minus_replay_pnl": "-2.50",
+    "runtime_net_pnl": "0"
+  },
+  "source": {
+    "path": "/mnt/c/Users/aldoa/OneDrive/Documents/Crypto Research and Execution/tests/fixtures/events_pnl_sample.jsonl",
+    "type": "local_jsonl"
+  },
+  "summary": {
+    "actual_paper_net_pnl": "0",
+    "actual_paper_state": "flat",
+    "replay_estimate_net_pnl": "2.50",
+    "replay_estimate_roi_on_cost": "1",
+    "replay_estimate_state": "winning",
+    "replay_market_level_95ci_high": null,
+    "replay_market_level_95ci_low": null,
+    "replay_market_level_mean_pnl": "2.50",
+    "replay_profitability_statistically_proven_95ci": null,
+    "runtime_minus_replay_fills": -1,
+    "runtime_minus_replay_pnl": "-2.50"
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "decisions_seen": 2,
+  "event_count": 5,
+  "fees": "0",
+  "filled_orders": 0,
+  "gross_pnl": "0",
+  "market_results": [
+    {
+      "end_ts": "2026-06-01T22:15:00+00:00",
+      "fees": "0",
+      "filled_orders": 0,
+      "final_price": "100100",
+      "gross_pnl": "0",
+      "market_id": "m1",
+      "market_slug": "btc-updown-15m-m1",
+      "net_pnl": "0",
+      "start_price": "100000",
+      "start_ts": "2026-06-01T22:00:00+00:00",
+      "winning_outcome": "up"
+    }
+  ],
+  "markets_seen": 1,
+  "markets_settled": 1,
+  "markets_with_start_price": 1,
+  "net_pnl": "0",
+  "notes": [],
+  "orders_seen": 1,
+  "path": "/mnt/c/Users/aldoa/OneDrive/Documents/Crypto Research and Execution/tests/fixtures/events_cancelled_maker_sample.jsonl",
+  "replay_metrics": {
+    "cancel_decisions_seen": 1,
+    "cancel_execution_reports_seen": 0,
+    "fills_after_cancel_prevented": 1,
+    "fills_prevented_expired": 0,
+    "fills_prevented_final_window": 0,
+    "fills_prevented_market_inactive": 0,
+    "fills_prevented_not_live": 0,
+    "fills_prevented_stale_book": 0,
+    "open_orders_remaining": 0,
+    "orders_cancelled": 1,
+    "placed_orders": 1
+  }
+}

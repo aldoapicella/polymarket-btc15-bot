@@ -1,0 +1,19 @@
+FROM rust:1.82-slim AS builder
+
+WORKDIR /app
+COPY Cargo.toml Cargo.lock ./
+COPY crates ./crates
+COPY tests/fixtures ./tests/fixtures
+RUN cargo build --release -p polyedge-cli
+
+FROM debian:bookworm-slim AS runtime
+
+WORKDIR /app
+COPY --from=builder /app/target/release/polyedge-rs /usr/local/bin/polyedge-rs
+COPY tests/fixtures ./tests/fixtures
+
+ENV EXECUTION_MODE=paper
+ENV ALLOW_LIVE=false
+EXPOSE 8081
+
+CMD ["polyedge-rs", "api", "--bind", "0.0.0.0:8081"]

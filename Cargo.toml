@@ -1,0 +1,54 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/polyedge-domain",
+    "crates/polyedge-config",
+    "crates/polyedge-feeds",
+    "crates/polyedge-engine",
+    "crates/polyedge-execution",
+    "crates/polyedge-storage",
+    "crates/polyedge-reporting",
+    "crates/polyedge-api",
+    "crates/polyedge-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "UNLICENSED"
+
+[workspace.dependencies]
+anyhow = "1.0"
+async-trait = "0.1"
+axum = { version = "0.7", features = ["ws"] }
+chrono = { version = "0.4", features = ["serde", "clock"] }
+clap = { version = "=4.5.23", features = ["derive", "env"] }
+criterion = "0.5"
+futures-util = "0.3"
+# Pin the URL/idna stack until this repo moves past Cargo 1.82; newer
+# idna_adapter releases require Edition 2024 support.
+idna_adapter = "=1.2.0"
+libm = "0.2"
+polyedge-api = { path = "crates/polyedge-api" }
+polyedge-config = { path = "crates/polyedge-config" }
+polyedge-domain = { path = "crates/polyedge-domain" }
+polyedge-engine = { path = "crates/polyedge-engine" }
+polyedge-execution = { path = "crates/polyedge-execution" }
+polyedge-feeds = { path = "crates/polyedge-feeds" }
+polyedge-reporting = { path = "crates/polyedge-reporting" }
+polyedge-storage = { path = "crates/polyedge-storage" }
+percent-encoding = "2.3"
+quick-xml = "=0.36.2"
+rust_decimal = { version = "=1.32.0", default-features = false, features = ["serde", "std"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+tokio = { version = "1.41", features = ["macros", "rt-multi-thread", "signal", "sync", "time", "fs"] }
+tokio-tungstenite = { version = "0.24", default-features = false, features = ["rustls-tls-webpki-roots"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+ureq = "=2.12.1"
+url = "=2.5.4"
+uuid = { version = "=1.11.0", features = ["v4", "serde"] }

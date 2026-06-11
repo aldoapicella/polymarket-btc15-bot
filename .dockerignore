@@ -13,3 +13,5 @@ frontend/.next
 frontend/node_modules
 frontend/tsconfig.tsbuildinfo
 docs/reports
+target
+.playwright-cli

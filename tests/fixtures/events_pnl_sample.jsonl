@@ -1,0 +1,5 @@
+{"event_type": "market", "payload": {"down_token_id": "down", "end_ts": "2026-06-01T22:15:00Z", "market_id": "m1", "market_slug": "btc-updown-15m-m1", "question": "Bitcoin Up or Down", "start_price": "100000", "start_ts": "2026-06-01T22:00:00Z", "up_token_id": "up"}, "recorded_ts": "2026-06-01T22:00:00+00:00"}
+{"event_type": "decision", "payload": {"action": "place", "market_id": "m1", "order_kind": "post_only_gtc", "outcome": "up", "price": "0.50", "side": "buy", "size": "5", "token_id": "up"}, "recorded_ts": "2026-06-01T22:01:00+00:00"}
+{"event_type": "execution_report", "payload": {"fee": "0", "filled_size": "0", "market_id": "m1", "order_id": "paper-1", "status": "paper_resting", "token_id": "up"}, "recorded_ts": "2026-06-01T22:01:01+00:00"}
+{"event_type": "book", "payload": {"asks": [{"price": "0.50", "size": "5"}], "token_id": "up"}, "recorded_ts": "2026-06-01T22:01:02+00:00"}
+{"event_type": "reference", "payload": {"local_ts": "2026-06-01T22:15:01Z", "price": "100100", "source": "polymarket_rtds_chainlink_btc_usd", "source_ts": "2026-06-01T22:15:01Z", "stale": false}, "recorded_ts": "2026-06-01T22:15:01+00:00"}

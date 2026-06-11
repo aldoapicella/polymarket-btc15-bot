@@ -1,0 +1,22 @@
+[package]
+name = "polyedge-execution"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+default = []
+live = []
+
+[dependencies]
+async-trait.workspace = true
+chrono.workspace = true
+polyedge-config.workspace = true
+polyedge-domain.workspace = true
+polyedge-engine.workspace = true
+rust_decimal.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+uuid.workspace = true

@@ -1,0 +1,22 @@
+[package]
+name = "polyedge-api"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+axum.workspace = true
+chrono.workspace = true
+futures-util.workspace = true
+polyedge-config.workspace = true
+polyedge-domain.workspace = true
+polyedge-reporting.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tower-http.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tower.workspace = true

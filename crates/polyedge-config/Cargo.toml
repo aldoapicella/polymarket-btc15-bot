@@ -1,0 +1,12 @@
+[package]
+name = "polyedge-config"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+polyedge-domain.workspace = true
+rust_decimal.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true

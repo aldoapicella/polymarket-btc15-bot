@@ -168,6 +168,10 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           name: 'api-bearer-token'
           value: apiBearerToken
         }
+        {
+          name: 'storage-account-key'
+          value: storage.listKeys().keys[0].value
+        }
       ]
       registries: [
         {
@@ -245,6 +249,10 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'AZURE_STORAGE_TABLE_NAME'
               value: storageTableName
+            }
+            {
+              name: 'AZURE_STORAGE_ACCOUNT_KEY'
+              secretRef: 'storage-account-key'
             }
             {
               name: 'AZURE_CHART_TABLE_NAME'

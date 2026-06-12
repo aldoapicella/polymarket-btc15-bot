@@ -21,10 +21,12 @@ license = "UNLICENSED"
 anyhow = "1.0"
 async-trait = "0.1"
 axum = { version = "0.7", features = ["ws"] }
+base64 = "0.22"
 chrono = { version = "0.4", features = ["serde", "clock"] }
 clap = { version = "=4.5.23", features = ["derive", "env"] }
 criterion = "0.5"
 futures-util = "0.3"
+hmac = "0.12"
 # Pin the URL/idna stack until this repo moves past Cargo 1.82; newer
 # idna_adapter releases require Edition 2024 support.
 idna_adapter = "=1.2.0"
@@ -43,6 +45,7 @@ regex = "1.11"
 rust_decimal = { version = "=1.32.0", default-features = false, features = ["serde", "std"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+sha2 = "0.10"
 thiserror = "1.0"
 tokio = { version = "1.41", features = ["macros", "rt-multi-thread", "signal", "sync", "time", "fs"] }
 tokio-tungstenite = { version = "0.24", default-features = false, features = ["rustls-tls-webpki-roots"] }

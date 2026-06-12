@@ -1,9 +1,12 @@
+use base64::{engine::general_purpose, Engine as _};
 use chrono::{DateTime, Utc};
+use hmac::{Hmac, Mac};
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS, NON_ALPHANUMERIC};
 use polyedge_domain::RuntimeEvent;
 use quick_xml::events::Event;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use sha2::Sha256;
 use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -18,6 +21,7 @@ const AZURE_TABLE_READ_TIMEOUT: Duration = Duration::from_secs(8);
 const AZURE_TABLE_WRITE_TIMEOUT: Duration = Duration::from_secs(5);
 type AzureTableContinuation = Option<(String, String)>;
 type AzureTablePage = (Vec<Value>, AzureTableContinuation);
+type HmacSha256 = Hmac<Sha256>;
 const PATH_SEGMENT_ENCODE_SET: &AsciiSet = &CONTROLS
     .add(b' ')
     .add(b'"')
@@ -184,6 +188,8 @@ pub enum AzureBlobError {
     ManagedIdentity(String),
     #[error("Azure Blob HTTP transport error: {0}")]
     Transport(String),
+    #[error("invalid Azure Storage account key: {0}")]
+    InvalidStorageKey(String),
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
     #[error("response body was not UTF-8: {0}")]
@@ -466,7 +472,13 @@ impl AzureBlobClient {
 pub struct AzureTableClient {
     account: String,
     agent: ureq::Agent,
-    token: ManagedIdentityToken,
+    auth: AzureTableAuth,
+}
+
+#[derive(Clone)]
+enum AzureTableAuth {
+    ManagedIdentity(ManagedIdentityToken),
+    SharedKey(String),
 }
 
 impl AzureTableClient {
@@ -478,7 +490,19 @@ impl AzureTableClient {
                 .timeout_read(AZURE_TABLE_READ_TIMEOUT)
                 .timeout_write(AZURE_TABLE_WRITE_TIMEOUT)
                 .build(),
-            token: ManagedIdentityToken::new(client_id),
+            auth: AzureTableAuth::ManagedIdentity(ManagedIdentityToken::new(client_id)),
+        }
+    }
+
+    pub fn with_account_key(account: impl Into<String>, account_key: impl Into<String>) -> Self {
+        Self {
+            account: account.into(),
+            agent: ureq::AgentBuilder::new()
+                .timeout_connect(AZURE_TABLE_CONNECT_TIMEOUT)
+                .timeout_read(AZURE_TABLE_READ_TIMEOUT)
+                .timeout_write(AZURE_TABLE_WRITE_TIMEOUT)
+                .build(),
+            auth: AzureTableAuth::SharedKey(account_key.into()),
         }
     }
 
@@ -536,13 +560,15 @@ impl AzureTableClient {
             self.account, table, query
         );
         for attempt in 0..AZURE_BLOB_MAX_ATTEMPTS {
-            let token = self.token.access_token(&self.agent)?;
+            let date = rfc1123_now();
+            let authorization = self.table_authorization(table, &date)?;
             let response = self
                 .agent
                 .get(&url)
-                .set("authorization", &format!("Bearer {token}"))
+                .set("authorization", &authorization)
                 .set("x-ms-version", AZURE_BLOB_API_VERSION)
-                .set("x-ms-date", &rfc1123_now())
+                .set("x-ms-date", &date)
+                .set("Date", &date)
                 .set("Accept", "application/json;odata=nometadata")
                 .set("DataServiceVersion", "3.0;NetFx")
                 .set("MaxDataServiceVersion", "3.0;NetFx")
@@ -569,6 +595,34 @@ impl AzureTableClient {
         }
         unreachable!("Azure Table retry loop always returns");
     }
+
+    fn table_authorization(&mut self, table: &str, date: &str) -> Result<String, AzureBlobError> {
+        match &mut self.auth {
+            AzureTableAuth::ManagedIdentity(token) => {
+                Ok(format!("Bearer {}", token.access_token(&self.agent)?))
+            }
+            AzureTableAuth::SharedKey(account_key) => {
+                shared_key_lite_header(&self.account, account_key, table, date)
+            }
+        }
+    }
+}
+
+fn shared_key_lite_header(
+    account: &str,
+    account_key: &str,
+    table: &str,
+    date: &str,
+) -> Result<String, AzureBlobError> {
+    let key = general_purpose::STANDARD
+        .decode(account_key.trim())
+        .map_err(|error| AzureBlobError::InvalidStorageKey(error.to_string()))?;
+    let string_to_sign = format!("{date}\n/{account}/{table}()");
+    let mut mac = HmacSha256::new_from_slice(&key)
+        .map_err(|error| AzureBlobError::InvalidStorageKey(error.to_string()))?;
+    mac.update(string_to_sign.as_bytes());
+    let signature = general_purpose::STANDARD.encode(mac.finalize().into_bytes());
+    Ok(format!("SharedKeyLite {account}:{signature}"))
 }
 
 fn parse_table_response(response: ureq::Response) -> Result<AzureTablePage, AzureBlobError> {

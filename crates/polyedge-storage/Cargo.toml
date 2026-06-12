@@ -5,13 +5,16 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+base64.workspace = true
 chrono.workspace = true
+hmac.workspace = true
 idna_adapter.workspace = true
 percent-encoding.workspace = true
 polyedge-domain.workspace = true
 quick-xml.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 thiserror.workspace = true
 ureq.workspace = true
 url.workspace = true

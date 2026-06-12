@@ -214,11 +214,16 @@ fn load_catalog_entity_with_client(
 }
 
 fn table_client(settings: &RuntimeSettings) -> Option<AzureTableClient> {
-    settings
-        .azure
-        .storage_account_name
-        .as_ref()
-        .map(|account| AzureTableClient::new(account, env::var("AZURE_CLIENT_ID").ok()))
+    let account = settings.azure.storage_account_name.as_ref()?;
+    match env::var("AZURE_STORAGE_ACCOUNT_KEY") {
+        Ok(account_key) if !account_key.trim().is_empty() => {
+            Some(AzureTableClient::with_account_key(account, account_key))
+        }
+        _ => Some(AzureTableClient::new(
+            account,
+            env::var("AZURE_CLIENT_ID").ok(),
+        )),
+    }
 }
 
 fn market_from_catalog_entity(entity: &Value) -> Option<Value> {

@@ -17,6 +17,7 @@ use thiserror::Error;
 
 const AZURE_BLOB_API_VERSION: &str = "2023-11-03";
 const AZURE_BLOB_MAX_ATTEMPTS: usize = 5;
+const AZURE_APPEND_BLOCK_TARGET_BYTES: usize = 4 * 1024 * 1024;
 const AZURE_TABLE_CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 const AZURE_TABLE_READ_TIMEOUT: Duration = Duration::from_secs(8);
 const AZURE_TABLE_WRITE_TIMEOUT: Duration = Duration::from_secs(5);
@@ -194,18 +195,37 @@ impl EventRecorder for AzureAppendBlobRecorder {
         if events.is_empty() {
             return Ok(());
         }
-        let mut batches = BTreeMap::<String, Vec<u8>>::new();
+        let mut batches = BTreeMap::<String, Vec<Vec<u8>>>::new();
         for event in events {
-            batches
-                .entry(event_blob_name(event))
-                .or_default()
-                .extend(jsonl_event_line(event)?);
+            append_event_line_chunk(
+                batches.entry(event_blob_name(event)).or_default(),
+                jsonl_event_line(event)?,
+                AZURE_APPEND_BLOCK_TARGET_BYTES,
+            );
         }
-        for (blob_name, lines) in batches {
-            self.append_line(&blob_name, &lines)?;
+        for (blob_name, chunks) in batches {
+            for chunk in chunks {
+                self.append_line(&blob_name, &chunk)?;
+            }
         }
         Ok(())
     }
+}
+
+fn append_event_line_chunk(chunks: &mut Vec<Vec<u8>>, line: Vec<u8>, max_bytes: usize) {
+    if line.is_empty() {
+        return;
+    }
+    if chunks
+        .last()
+        .is_none_or(|chunk| !chunk.is_empty() && chunk.len() + line.len() > max_bytes)
+    {
+        chunks.push(Vec::new());
+    }
+    chunks
+        .last_mut()
+        .expect("append chunk is created before use")
+        .extend(line);
 }
 
 fn event_blob_name(event: &RuntimeEvent) -> String {
@@ -942,5 +962,40 @@ impl LocalReportStore {
         let path = self.root.join("latest-report.json");
         fs::write(&path, serde_json::to_vec_pretty(payload)?)?;
         Ok(path)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use polyedge_domain::RuntimeEvent;
+    use serde_json::json;
+
+    #[test]
+    fn append_event_line_chunk_preserves_lines_and_caps_chunks() {
+        let events: Vec<_> = (0..5)
+            .map(|index| RuntimeEvent {
+                event_type: "book".to_owned(),
+                ts: Utc::now(),
+                data: json!({
+                    "index": index,
+                    "padding": "x".repeat(60)
+                }),
+            })
+            .collect();
+        let mut chunks = Vec::new();
+        for event in &events {
+            append_event_line_chunk(&mut chunks, jsonl_event_line(event).unwrap(), 220);
+        }
+
+        assert!(chunks.len() > 1);
+        assert!(chunks.iter().all(|chunk| chunk.len() <= 220));
+        let joined = chunks.concat();
+        let lines = String::from_utf8(joined).unwrap();
+        assert_eq!(lines.lines().count(), events.len());
+        for line in lines.lines() {
+            let value: Value = serde_json::from_str(line).unwrap();
+            assert_eq!(value["event_type"], "book");
+        }
     }
 }

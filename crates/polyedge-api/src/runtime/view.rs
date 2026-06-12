@@ -55,9 +55,10 @@ impl RuntimeController {
             },
             "queue_depths": {
                 "feed_events": 0,
-                "runtime_events": 0,
-                "recorder": 0
+                "runtime_events": data.runtime_events,
+                "recorder": self.inner.recorder_metrics.queued.load(Ordering::Relaxed)
             },
+            "recorder_metrics": self.inner.recorder_metrics.snapshot(),
             "drop_counts": data.drop_counts,
             "feed_status": data.feed_status,
             "recorder_status": recorder_status.clone(),

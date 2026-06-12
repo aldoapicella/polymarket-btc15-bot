@@ -24,7 +24,7 @@ use rust_decimal::Decimal;
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, VecDeque};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc as std_mpsc;
 use std::sync::{Arc, Mutex as StdMutex};
 use std::time::Duration;
@@ -35,7 +35,7 @@ use tracing::{debug, error, info, warn};
 const RECENT_LIMIT: usize = 1_000;
 const HISTORY_LIMIT: usize = 500;
 const CHART_HISTORY_LIMIT: usize = 2_000;
-const RECORDER_BATCH_LIMIT: usize = 5_000;
+const RECORDER_BATCH_LIMIT: usize = 500;
 
 #[derive(Clone)]
 pub struct RuntimeController {
@@ -48,8 +48,32 @@ struct RuntimeInner {
     engine: Mutex<RuntimeEngine>,
     recorder: Arc<StdMutex<RuntimeRecorder>>,
     recorder_tx: std_mpsc::Sender<RuntimeEvent>,
+    recorder_metrics: Arc<RecorderMetrics>,
     broadcaster: broadcast::Sender<RuntimeEvent>,
     started: AtomicBool,
+}
+
+#[derive(Debug, Default)]
+struct RecorderMetrics {
+    queued: AtomicUsize,
+    enqueued_total: AtomicU64,
+    persisted_total: AtomicU64,
+    failed_total: AtomicU64,
+    batches_total: AtomicU64,
+    last_batch_size: AtomicUsize,
+}
+
+impl RecorderMetrics {
+    fn snapshot(&self) -> Value {
+        json!({
+            "queued": self.queued.load(Ordering::Relaxed),
+            "enqueued_total": self.enqueued_total.load(Ordering::Relaxed),
+            "persisted_total": self.persisted_total.load(Ordering::Relaxed),
+            "failed_total": self.failed_total.load(Ordering::Relaxed),
+            "batches_total": self.batches_total.load(Ordering::Relaxed),
+            "last_batch_size": self.last_batch_size.load(Ordering::Relaxed)
+        })
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -121,8 +145,13 @@ impl RuntimeController {
             last_volatility_update_key: None,
         };
         let recorder = Arc::new(StdMutex::new(RuntimeRecorder::new(&settings)));
+        let recorder_metrics = Arc::new(RecorderMetrics::default());
         let (recorder_tx, recorder_rx) = std_mpsc::channel();
-        spawn_recorder_worker(Arc::clone(&recorder), recorder_rx);
+        spawn_recorder_worker(
+            Arc::clone(&recorder),
+            recorder_rx,
+            Arc::clone(&recorder_metrics),
+        );
         Self {
             inner: Arc::new(RuntimeInner {
                 settings,
@@ -130,6 +159,7 @@ impl RuntimeController {
                 engine: Mutex::new(engine),
                 recorder,
                 recorder_tx,
+                recorder_metrics,
                 broadcaster,
                 started: AtomicBool::new(false),
             }),
@@ -848,7 +878,22 @@ impl RuntimeController {
             ts: Utc::now(),
             data: data.clone(),
         };
+        self.inner
+            .recorder_metrics
+            .queued
+            .fetch_add(1, Ordering::Relaxed);
+        self.inner
+            .recorder_metrics
+            .enqueued_total
+            .fetch_add(1, Ordering::Relaxed);
         let recorder_queue_failed = self.inner.recorder_tx.send(event.clone()).is_err();
+        if recorder_queue_failed {
+            saturating_sub_atomic(&self.inner.recorder_metrics.queued, 1);
+            self.inner
+                .recorder_metrics
+                .failed_total
+                .fetch_add(1, Ordering::Relaxed);
+        }
         {
             let mut state = self.inner.data.write().await;
             state.runtime_events += 1;
@@ -924,6 +969,7 @@ impl RuntimeController {
 fn spawn_recorder_worker(
     recorder: Arc<StdMutex<RuntimeRecorder>>,
     receiver: std_mpsc::Receiver<RuntimeEvent>,
+    metrics: Arc<RecorderMetrics>,
 ) {
     if let Err(error) = std::thread::Builder::new()
         .name("polyedge-recorder".to_owned())
@@ -937,6 +983,10 @@ fn spawn_recorder_worker(
                         Err(std_mpsc::TryRecvError::Disconnected) => break,
                     }
                 }
+                metrics.batches_total.fetch_add(1, Ordering::Relaxed);
+                metrics
+                    .last_batch_size
+                    .store(batch.len(), Ordering::Relaxed);
                 let result = match recorder.lock() {
                     Ok(mut recorder) => recorder.record_batch(&batch),
                     Err(error) => {
@@ -944,14 +994,31 @@ fn spawn_recorder_worker(
                         break;
                     }
                 };
-                if let Err(error) = result {
-                    warn!("runtime recorder failed: {error}");
+                saturating_sub_atomic(&metrics.queued, batch.len());
+                match result {
+                    Ok(()) => {
+                        metrics
+                            .persisted_total
+                            .fetch_add(batch.len() as u64, Ordering::Relaxed);
+                    }
+                    Err(error) => {
+                        metrics
+                            .failed_total
+                            .fetch_add(batch.len() as u64, Ordering::Relaxed);
+                        warn!("runtime recorder failed: {error}");
+                    }
                 }
             }
         })
     {
         warn!("failed to start runtime recorder worker: {error}");
     }
+}
+
+fn saturating_sub_atomic(value: &AtomicUsize, amount: usize) {
+    let _ = value.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
+        Some(current.saturating_sub(amount))
+    });
 }
 
 fn active_markets(data: &RuntimeData) -> Vec<&MarketSpec> {
@@ -1046,10 +1113,13 @@ mod tests {
         ));
         let path = dir.join("events.jsonl");
         let recorder = Arc::new(StdMutex::new(RuntimeRecorder::new_for_path(path.clone())));
+        let metrics = Arc::new(RecorderMetrics::default());
         let (sender, receiver) = std_mpsc::channel();
-        spawn_recorder_worker(Arc::clone(&recorder), receiver);
+        spawn_recorder_worker(Arc::clone(&recorder), receiver, Arc::clone(&metrics));
 
         for index in 0..100 {
+            metrics.queued.fetch_add(1, Ordering::Relaxed);
+            metrics.enqueued_total.fetch_add(1, Ordering::Relaxed);
             sender
                 .send(RuntimeEvent {
                     event_type: "book".to_owned(),
@@ -1073,6 +1143,10 @@ mod tests {
         let text = fs::read_to_string(&path).unwrap();
         assert_eq!(text.lines().count(), 100);
         assert_eq!(recorder.lock().unwrap().status(false)["error_count"], 0);
+        assert_eq!(metrics.snapshot()["queued"], 0);
+        assert_eq!(metrics.snapshot()["enqueued_total"], 100);
+        assert_eq!(metrics.snapshot()["persisted_total"], 100);
+        assert_eq!(metrics.snapshot()["failed_total"], 0);
         let _ = fs::remove_dir_all(dir);
     }
 }

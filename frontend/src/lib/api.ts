@@ -3,6 +3,7 @@
 import type {
   ConfigAuditEntry,
   ConfigValidation,
+  JsonRecord,
   MarketDetail,
   ReportJob,
   ReportPayload,
@@ -11,7 +12,7 @@ import type {
   RuntimeConfigPatch,
   Snapshot
 } from "@/lib/types";
-import type { ChartRange, MarketSeries } from "@/lib/charting";
+import type { ChartPoint, ChartRange, MarketSeries } from "@/lib/charting";
 
 type FetchOptions = {
   method?: "GET" | "POST";
@@ -48,7 +49,9 @@ export function getHistoricalMarkets(limit = 200) {
 
 export function getMarketChart(marketId: string, range: ChartRange = "full") {
   const query = new URLSearchParams({ range });
-  return backendFetch<MarketSeries>(`markets/${encodeURIComponent(marketId)}/chart?${query.toString()}`);
+  return backendFetch<unknown>(`markets/${encodeURIComponent(marketId)}/chart?${query.toString()}`).then((payload) =>
+    normalizeMarketSeries(payload, range)
+  );
 }
 
 export function getRecentEvents(params: { marketId?: string; type?: string; limit?: number } = {}) {
@@ -158,4 +161,126 @@ export function resumeBot(reason: string) {
       source: "ui"
     }
   });
+}
+
+function normalizeMarketSeries(payload: unknown, requestedRange: ChartRange): MarketSeries {
+  const record = asRecord(payload) ?? {};
+  const marketChart = chartPoints(record.marketChart ?? record.points);
+  const explicitFills = chartPoints(record.fills);
+  const fills = explicitFills.length ? explicitFills : marketChart.filter((point) => point.fillPrice !== undefined);
+  const sampleCount =
+    numeric(record.sampleCount) ??
+    numeric(asRecord(record.summary)?.sample_count) ??
+    numeric(asRecord(record.summary)?.sampleCount) ??
+    marketChart.length;
+
+  return {
+    source: text(record.source),
+    warning: text(record.warning) ?? null,
+    market_id: text(record.market_id) ?? text(record.marketId),
+    range: chartRange(record.range) ?? requestedRange,
+    marketChart,
+    fills,
+    domain: domain(record.domain) ?? derivedDomain([...marketChart, ...fills]) ?? defaultDomain(),
+    sampleCount
+  };
+}
+
+function chartPoints(value: unknown): ChartPoint[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.map(chartPoint).filter((point): point is ChartPoint => point !== null);
+}
+
+function chartPoint(value: unknown): ChartPoint | null {
+  const record = asRecord(value);
+  if (!record) {
+    return null;
+  }
+  const bucket =
+    numeric(record.bucket) ??
+    timestamp(record.time) ??
+    timestamp(record.ts) ??
+    timestamp(record.local_ts) ??
+    timestamp(record.recorded_ts);
+  if (bucket === undefined) {
+    return null;
+  }
+  const point: ChartPoint = {
+    bucket,
+    time: text(record.time) ?? text(record.ts) ?? text(record.local_ts) ?? new Date(bucket).toISOString()
+  };
+  assignNumber(point, "qUp", record.qUp, record.q_up);
+  assignNumber(point, "qDown", record.qDown, record.q_down);
+  assignNumber(point, "upBid", record.upBid, record.up_bid);
+  assignNumber(point, "upAsk", record.upAsk, record.up_ask);
+  assignNumber(point, "downBid", record.downBid, record.down_bid);
+  assignNumber(point, "downAsk", record.downAsk, record.down_ask);
+  assignNumber(point, "distanceBps", record.distanceBps, record.distance_bps);
+  assignNumber(point, "referencePrice", record.referencePrice, record.reference_price);
+  assignNumber(point, "fillPrice", record.fillPrice, record.fill_price);
+  assignNumber(point, "fillSize", record.fillSize, record.fill_size);
+  point.fillOutcome = text(record.fillOutcome) ?? text(record.fill_outcome);
+  return point;
+}
+
+function assignNumber(point: ChartPoint, key: keyof ChartPoint, ...values: unknown[]) {
+  const value = values.map(numeric).find((candidate) => candidate !== undefined);
+  if (value !== undefined) {
+    (point as Record<keyof ChartPoint, unknown>)[key] = value;
+  }
+}
+
+function domain(value: unknown): [number, number] | undefined {
+  if (!Array.isArray(value) || value.length !== 2) {
+    return undefined;
+  }
+  const start = numeric(value[0]);
+  const end = numeric(value[1]);
+  return start !== undefined && end !== undefined && end > start ? [start, end] : undefined;
+}
+
+function derivedDomain(points: ChartPoint[]): [number, number] | undefined {
+  if (!points.length) {
+    return undefined;
+  }
+  const buckets = points.map((point) => point.bucket).filter(Number.isFinite);
+  if (!buckets.length) {
+    return undefined;
+  }
+  const start = Math.min(...buckets);
+  const end = Math.max(...buckets);
+  return end > start ? [start, end] : [start, start + 15 * 60 * 1000];
+}
+
+function defaultDomain(): [number, number] {
+  const now = Date.now();
+  return [now - 15 * 60 * 1000, now];
+}
+
+function chartRange(value: unknown): ChartRange | undefined {
+  return value === "full" || value === "5m" || value === "1m" ? value : undefined;
+}
+
+function timestamp(value: unknown): number | undefined {
+  const raw = text(value);
+  if (!raw) {
+    return undefined;
+  }
+  const parsed = new Date(raw).getTime();
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function numeric(value: unknown): number | undefined {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function text(value: unknown): string | undefined {
+  return typeof value === "string" && value.length ? value : undefined;
+}
+
+function asRecord(value: unknown): JsonRecord | undefined {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : undefined;
 }

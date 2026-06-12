@@ -144,7 +144,11 @@ impl RuntimeController {
         self.spawn_market_feed_loop(sender.clone());
         self.spawn_rtds_loop(sender.clone());
         self.spawn_chainlink_http_loop(sender.clone());
-        self.spawn_binance_loop(sender);
+        if self.inner.settings.target.enable_direct_binance_book_ticker {
+            self.spawn_binance_loop(sender);
+        } else {
+            info!("Direct Binance bookTicker feed disabled by configuration");
+        }
         info!("Rust PolyEdge runtime started in paper mode");
     }
 

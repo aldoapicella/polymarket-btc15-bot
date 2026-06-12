@@ -235,6 +235,10 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
               value: 'btcusdt'
             }
             {
+              name: 'ENABLE_DIRECT_BINANCE_BOOK_TICKER'
+              value: 'false'
+            }
+            {
               name: 'TARGET_COINBASE_PRODUCT_ID'
               value: 'BTC-USD'
             }

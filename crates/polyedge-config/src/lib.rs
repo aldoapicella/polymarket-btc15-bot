@@ -67,6 +67,7 @@ pub struct TargetConfig {
     pub discovery_interval_seconds: f64,
     pub enable_polymarket_rtds_chainlink: bool,
     pub enable_polymarket_rtds_binance: bool,
+    pub enable_direct_binance_book_ticker: bool,
     pub rtds_ping_interval_seconds: f64,
     pub start_price_capture_grace_seconds: f64,
     #[serde(with = "decimal_string")]
@@ -93,6 +94,7 @@ impl Default for TargetConfig {
             discovery_interval_seconds: 20.0,
             enable_polymarket_rtds_chainlink: true,
             enable_polymarket_rtds_binance: true,
+            enable_direct_binance_book_ticker: false,
             rtds_ping_interval_seconds: 5.0,
             start_price_capture_grace_seconds: 5.0,
             reference_divergence_pause_threshold: Decimal::new(15, 4),
@@ -311,6 +313,10 @@ impl RuntimeSettings {
             "ENABLE_POLYMARKET_RTDS_BINANCE",
             settings.target.enable_polymarket_rtds_binance,
         );
+        settings.target.enable_direct_binance_book_ticker = env_bool(
+            "ENABLE_DIRECT_BINANCE_BOOK_TICKER",
+            settings.target.enable_direct_binance_book_ticker,
+        );
         settings.target.rtds_ping_interval_seconds = env_f64(
             "RTDS_PING_INTERVAL_SECONDS",
             settings.target.rtds_ping_interval_seconds,
@@ -475,6 +481,9 @@ impl RuntimeSettings {
                 "enable_taker_orders": self.strategy.enable_taker_orders,
                 "allow_emergency_account_cancel": self.live.allow_emergency_account_cancel,
                 "require_api_auth": self.deploy.require_api_auth,
+                "enable_polymarket_rtds_chainlink": self.target.enable_polymarket_rtds_chainlink,
+                "enable_polymarket_rtds_binance": self.target.enable_polymarket_rtds_binance,
+                "enable_direct_binance_book_ticker": self.target.enable_direct_binance_book_ticker,
                 "rust_proxy_runtime_api": self.deploy.rust_proxy_runtime_api,
                 "rust_upstream_api_configured": self.deploy.rust_upstream_api_base_url.is_some(),
                 "rust_upstream_ws_configured": self.deploy.rust_upstream_ws_url.is_some(),

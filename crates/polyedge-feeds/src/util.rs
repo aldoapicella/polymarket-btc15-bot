@@ -3,6 +3,7 @@ use chrono::{DateTime, TimeZone, Utc};
 use polyedge_domain::BookLevel;
 use rust_decimal::Decimal;
 use serde_json::Value;
+use std::io::Read;
 use tokio_tungstenite::tungstenite::Message;
 use url::Url;
 
@@ -83,8 +84,10 @@ pub(crate) fn websocket_json(message: Message) -> Option<Value> {
 
 pub(crate) fn get_json(agent: &ureq::Agent, url: &str) -> Result<Value, FeedError> {
     let response = agent.get(url).call().map_err(ureq_error)?;
-    let text = response
-        .into_string()
+    let mut text = String::new();
+    response
+        .into_reader()
+        .read_to_string(&mut text)
         .map_err(|error| FeedError::HttpTransport(error.to_string()))?;
     Ok(serde_json::from_str(&text)?)
 }

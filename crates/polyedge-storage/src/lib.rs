@@ -13,6 +13,8 @@ use thiserror::Error;
 
 const AZURE_BLOB_API_VERSION: &str = "2023-11-03";
 const AZURE_BLOB_MAX_ATTEMPTS: usize = 5;
+type AzureTableContinuation = Option<(String, String)>;
+type AzureTablePage = (Vec<Value>, AzureTableContinuation);
 const PATH_SEGMENT_ENCODE_SET: &AsciiSet = &CONTROLS
     .add(b' ')
     .add(b'"')
@@ -183,6 +185,8 @@ pub enum AzureBlobError {
     Io(#[from] std::io::Error),
     #[error("response body was not UTF-8: {0}")]
     Utf8(#[from] std::string::FromUtf8Error),
+    #[error("json error: {0}")]
+    Json(#[from] serde_json::Error),
     #[error("XML parse error: {0}")]
     Xml(#[from] quick_xml::Error),
     #[error("failed to parse Azure blob list XML: {0}")]
@@ -452,6 +456,137 @@ impl AzureBlobClient {
         }
         unreachable!("Azure Blob retry loop always returns");
     }
+}
+
+#[derive(Clone)]
+pub struct AzureTableClient {
+    account: String,
+    agent: ureq::Agent,
+    token: ManagedIdentityToken,
+}
+
+impl AzureTableClient {
+    pub fn new(account: impl Into<String>, client_id: Option<String>) -> Self {
+        Self {
+            account: account.into(),
+            agent: ureq::AgentBuilder::new()
+                .timeout_connect(Duration::from_secs(10))
+                .timeout_read(Duration::from_secs(30))
+                .timeout_write(Duration::from_secs(30))
+                .build(),
+            token: ManagedIdentityToken::new(client_id),
+        }
+    }
+
+    pub fn query_entities(
+        &mut self,
+        table: &str,
+        filter: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<Value>, AzureBlobError> {
+        let mut entities = Vec::new();
+        let mut continuation: Option<(String, String)> = None;
+        while entities.len() < limit {
+            let top = (limit - entities.len()).min(1000);
+            let (page, next) = self.query_page(table, filter, top, continuation.as_ref())?;
+            if page.is_empty() {
+                break;
+            }
+            entities.extend(page);
+            continuation = next;
+            if continuation.is_none() {
+                break;
+            }
+        }
+        Ok(entities)
+    }
+
+    fn query_page(
+        &mut self,
+        table: &str,
+        filter: Option<&str>,
+        top: usize,
+        continuation: Option<&(String, String)>,
+    ) -> Result<AzureTablePage, AzureBlobError> {
+        let mut params = vec![("$top".to_owned(), top.to_string())];
+        if let Some(filter) = filter {
+            params.push(("$filter".to_owned(), filter.to_owned()));
+        }
+        if let Some((partition_key, row_key)) = continuation {
+            params.push(("NextPartitionKey".to_owned(), partition_key.clone()));
+            params.push(("NextRowKey".to_owned(), row_key.clone()));
+        }
+        let query = params
+            .iter()
+            .map(|(key, value)| {
+                format!(
+                    "{}={}",
+                    utf8_percent_encode(key, NON_ALPHANUMERIC),
+                    utf8_percent_encode(value, NON_ALPHANUMERIC)
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("&");
+        let url = format!(
+            "https://{}.table.core.windows.net/{}()?{}",
+            self.account, table, query
+        );
+        for attempt in 0..AZURE_BLOB_MAX_ATTEMPTS {
+            let token = self.token.access_token(&self.agent)?;
+            let response = self
+                .agent
+                .get(&url)
+                .set("authorization", &format!("Bearer {token}"))
+                .set("x-ms-version", AZURE_BLOB_API_VERSION)
+                .set("x-ms-date", &rfc1123_now())
+                .set("Accept", "application/json;odata=nometadata")
+                .set("DataServiceVersion", "3.0;NetFx")
+                .set("MaxDataServiceVersion", "3.0;NetFx")
+                .call();
+            match response {
+                Ok(response) => return parse_table_response(response),
+                Err(ureq::Error::Status(status, _))
+                    if is_retryable_azure_status(status)
+                        && attempt + 1 < AZURE_BLOB_MAX_ATTEMPTS =>
+                {
+                    thread::sleep(retry_delay(attempt));
+                }
+                Err(ureq::Error::Status(status, _)) => {
+                    return Err(AzureBlobError::HttpStatus(status));
+                }
+                Err(ureq::Error::Transport(error)) if attempt + 1 < AZURE_BLOB_MAX_ATTEMPTS => {
+                    thread::sleep(retry_delay(attempt));
+                    let _ = error;
+                }
+                Err(ureq::Error::Transport(error)) => {
+                    return Err(AzureBlobError::Transport(error.to_string()));
+                }
+            }
+        }
+        unreachable!("Azure Table retry loop always returns");
+    }
+}
+
+fn parse_table_response(response: ureq::Response) -> Result<AzureTablePage, AzureBlobError> {
+    let next_partition_key = response
+        .header("x-ms-continuation-NextPartitionKey")
+        .map(str::to_owned);
+    let next_row_key = response
+        .header("x-ms-continuation-NextRowKey")
+        .map(str::to_owned);
+    let text = response.into_string()?;
+    let payload: Value = serde_json::from_str(&text)?;
+    let entities = payload
+        .get("value")
+        .or_else(|| payload.get("items"))
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let continuation = match (next_partition_key, next_row_key) {
+        (Some(partition_key), Some(row_key)) => Some((partition_key, row_key)),
+        _ => None,
+    };
+    Ok((entities, continuation))
 }
 
 fn is_retryable_azure_status(status: u16) -> bool {

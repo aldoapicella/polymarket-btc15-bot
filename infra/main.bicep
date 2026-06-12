@@ -57,6 +57,8 @@ var managedEnvironmentName = '${appName}-${environmentName}-env'
 var containerAppName = '${appName}-${environmentName}'
 var storageContainerName = 'bot-events'
 var storageTableName = 'BotEventIndex'
+var chartTableName = 'BotChartSeries'
+var marketTableName = 'BotMarketCatalog'
 var frontendEnabled = !empty(frontendImage)
 var containerAppIdentityName = '${containerAppName}-id'
 var tags = {
@@ -104,6 +106,16 @@ resource tableService 'Microsoft.Storage/storageAccounts/tableServices@2023-05-0
 resource eventIndexTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2023-05-01' = {
   parent: tableService
   name: storageTableName
+}
+
+resource chartSeriesTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2023-05-01' = {
+  parent: tableService
+  name: chartTableName
+}
+
+resource marketCatalogTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2023-05-01' = {
+  parent: tableService
+  name: marketTableName
 }
 
 resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
@@ -235,6 +247,14 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
               value: storageTableName
             }
             {
+              name: 'AZURE_CHART_TABLE_NAME'
+              value: chartTableName
+            }
+            {
+              name: 'AZURE_MARKET_TABLE_NAME'
+              value: marketTableName
+            }
+            {
               name: 'AZURE_EVENT_INDEX_TYPES'
               value: 'market,market_start_price,paper_settlement,fair_value,decision,execution_report,feed_error,reference,live_heartbeat'
             }
@@ -343,3 +363,5 @@ output containerAppIdentityName string = containerAppIdentity.name
 output storageAccountName string = storage.name
 output storageContainerName string = storageContainerName
 output storageTableName string = storageTableName
+output chartTableName string = chartTableName
+output marketTableName string = marketTableName

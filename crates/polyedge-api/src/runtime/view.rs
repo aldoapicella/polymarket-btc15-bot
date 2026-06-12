@@ -141,6 +141,31 @@ impl RuntimeController {
         }))
     }
 
+    pub async fn market_chart(&self, market_id: &str, range: &str) -> Option<Value> {
+        let data = self.inner.data.read().await;
+        let market = data.markets.get(&MarketId::new(market_id.to_owned()))?;
+        let mut points = data
+            .chart_samples
+            .get(&market.market_id)
+            .map(|samples| samples.iter().cloned().collect::<Vec<_>>())
+            .unwrap_or_default();
+        let stored_count = points.len();
+        filter_chart_range(&mut points, range);
+        Some(json!({
+            "source": "rust_runtime_memory",
+            "market_id": market.market_id,
+            "range": range,
+            "points": points,
+            "domain": [
+                market.start_ts.timestamp_millis(),
+                market.end_ts.timestamp_millis()
+            ],
+            "summary": {
+                "sample_count": stored_count
+            }
+        }))
+    }
+
     pub async fn orders(&self) -> Vec<Value> {
         let engine = self.inner.engine.lock().await;
         engine
@@ -228,6 +253,33 @@ impl RuntimeController {
         }
         value
     }
+}
+
+fn filter_chart_range(points: &mut Vec<Value>, range: &str) {
+    let Some(window_ms) = chart_window_ms(range) else {
+        return;
+    };
+    let Some(last_bucket) = points.iter().filter_map(point_bucket).max() else {
+        return;
+    };
+    let cutoff = last_bucket - window_ms;
+    points.retain(|point| point_bucket(point).is_some_and(|bucket| bucket >= cutoff));
+}
+
+fn chart_window_ms(range: &str) -> Option<i64> {
+    match range {
+        "1m" => Some(60_000),
+        "5m" => Some(5 * 60_000),
+        _ => None,
+    }
+}
+
+fn point_bucket(point: &Value) -> Option<i64> {
+    point.get("bucket").and_then(|value| match value {
+        Value::Number(number) => number.as_i64(),
+        Value::String(text) => text.parse().ok(),
+        _ => None,
+    })
 }
 
 fn latest_chronological<T: Clone>(values: &VecDeque<T>, limit: usize) -> Vec<T> {

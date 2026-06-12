@@ -10,13 +10,19 @@ use polyedge_config::{ExecutionMode, RuntimeSettings};
 use polyedge_reporting::{build_pnl_report, run_backtest};
 use serde::Deserialize;
 use serde_json::{json, Value};
+use std::env;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 
+mod history;
 mod runtime;
+use history::{
+    empty_chart, historical_detail, max_historical_markets, merge_market_lists,
+    overlay_detail_market, MarketHistoryStore,
+};
 use runtime::RuntimeController;
 
 const RECENT_EVENTS_MAX: usize = 500;
@@ -153,21 +159,48 @@ async fn markets_history(
     State(state): State<ApiState>,
     Query(query): Query<LimitQuery>,
 ) -> Json<Value> {
-    let limit = query.limit.unwrap_or(100);
-    let mut markets = state.runtime.markets().await;
-    if markets.len() > limit {
-        markets = markets.split_off(markets.len() - limit);
-    }
-    Json(json!({ "markets": markets }))
+    let limit = query.limit.unwrap_or(100).min(max_historical_markets());
+    let store = MarketHistoryStore::new(&state.settings);
+    let live_markets = state.runtime.markets().await;
+    let live_count = live_markets.len();
+    let historical_markets = match store.markets(limit).await {
+        Ok(markets) => markets,
+        Err(error) => {
+            tracing::warn!("historical market table read failed: {error}");
+            Vec::new()
+        }
+    };
+    let historical_count = historical_markets.len();
+    let markets = merge_market_lists(live_markets, historical_markets, limit);
+    Json(json!({
+        "markets": markets,
+        "source": {
+            "live": live_count,
+            "historical": historical_count
+        }
+    }))
 }
 
 async fn market_detail(
     State(state): State<ApiState>,
     Path(market_id): Path<String>,
 ) -> impl IntoResponse {
-    match state.runtime.market_detail(&market_id).await {
-        Some(detail) => (StatusCode::OK, Json(detail)),
-        None => (
+    let store = MarketHistoryStore::new(&state.settings);
+    let historical = match store.market(&market_id).await {
+        Ok(market) => market,
+        Err(error) => {
+            tracing::warn!("historical market detail read failed for {market_id}: {error}");
+            None
+        }
+    };
+    match (state.runtime.market_detail(&market_id).await, historical) {
+        (Some(detail), Some(historical_market)) => (
+            StatusCode::OK,
+            Json(overlay_detail_market(detail, historical_market)),
+        ),
+        (Some(detail), None) => (StatusCode::OK, Json(detail)),
+        (None, Some(market)) => (StatusCode::OK, Json(historical_detail(market))),
+        (None, None) => (
             StatusCode::NOT_FOUND,
             Json(json!({ "detail": format!("Market {market_id} was not found.") })),
         ),
@@ -180,17 +213,38 @@ struct ChartQuery {
 }
 
 async fn market_chart(
+    State(state): State<ApiState>,
     Path(market_id): Path<String>,
     Query(query): Query<ChartQuery>,
 ) -> Json<Value> {
-    Json(json!({
-        "market_id": market_id,
-        "range": query.range.unwrap_or_else(|| "full".to_owned()),
-        "points": [],
-        "summary": {
-            "sample_count": 0
+    let range = query.range.unwrap_or_else(|| "full".to_owned());
+    if let Some(runtime_chart) = state.runtime.market_chart(&market_id, &range).await {
+        let sample_count = runtime_chart
+            .get("summary")
+            .and_then(|summary| summary.get("sample_count"))
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
+        if sample_count > 0 {
+            return Json(runtime_chart);
         }
-    }))
+    }
+    let store = MarketHistoryStore::new(&state.settings);
+    match store.chart(&market_id, &range).await {
+        Ok(Some(chart)) => Json(chart),
+        Ok(None) => Json(empty_chart(&market_id, &range)),
+        Err(error) => {
+            tracing::warn!("historical chart table read failed for {market_id}: {error}");
+            Json(json!({
+                "market_id": market_id,
+                "range": range,
+                "points": [],
+                "summary": {
+                    "sample_count": 0
+                },
+                "warning": error
+            }))
+        }
+    }
 }
 
 async fn orders(State(state): State<ApiState>) -> Json<Value> {

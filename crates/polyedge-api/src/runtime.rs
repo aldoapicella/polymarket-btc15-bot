@@ -1,7 +1,9 @@
+mod chart;
 mod recorder;
 mod reference;
 mod view;
 
+use chart::chart_sample_from_data;
 use chrono::{DateTime, Utc};
 use polyedge_config::{ExecutionMode, RuntimeSettings};
 use polyedge_domain::{
@@ -29,6 +31,7 @@ use tracing::{debug, error, info, warn};
 
 const RECENT_LIMIT: usize = 1_000;
 const HISTORY_LIMIT: usize = 500;
+const CHART_HISTORY_LIMIT: usize = 2_000;
 
 #[derive(Clone)]
 pub struct RuntimeController {
@@ -55,6 +58,7 @@ struct RuntimeData {
     books: BTreeMap<TokenId, BookState>,
     reference: Option<ReferencePrice>,
     fair_values: BTreeMap<MarketId, Value>,
+    chart_samples: BTreeMap<MarketId, VecDeque<Value>>,
     decisions: VecDeque<TradeDecision>,
     execution_reports: VecDeque<ExecutionReport>,
     recent_events: VecDeque<RuntimeEvent>,
@@ -89,6 +93,7 @@ impl RuntimeController {
             books: BTreeMap::new(),
             reference: None,
             fair_values: BTreeMap::new(),
+            chart_samples: BTreeMap::new(),
             decisions: VecDeque::new(),
             execution_reports: VecDeque::new(),
             recent_events: VecDeque::new(),
@@ -477,6 +482,9 @@ impl RuntimeController {
             Some(publish_payload),
         )
         .await;
+        if let Some(market) = market {
+            self.push_market_chart_sample(&market.market_id).await;
+        }
         self.handle_paper_fills(&book).await;
     }
 
@@ -568,6 +576,7 @@ impl RuntimeController {
                         serde_json::to_value(&fair_value).unwrap_or(Value::Null),
                     );
                 }
+                self.push_market_chart_sample(&market.market_id).await;
                 self.record_event("fair_value", &fair_value, Some("fair_value_update"), None)
                     .await;
                 let raw_decisions = engine.strategy.evaluate(&market, &fair_value, &books);
@@ -634,9 +643,21 @@ impl RuntimeController {
         }
         self.record_event("execution_report", &report, None, None)
             .await;
+        self.push_market_chart_sample(&report.market_id).await;
         if publish_fill && report.status == "paper_filled_maker" {
             self.publish_only("paper_fill", &report).await;
         }
+    }
+
+    async fn push_market_chart_sample(&self, market_id: &MarketId) {
+        let mut data = self.inner.data.write().await;
+        let Some(market) = data.markets.get(market_id).cloned() else {
+            return;
+        };
+        let point = chart_sample_from_data(&market, &data, Utc::now());
+        let samples = data.chart_samples.entry(market_id.clone()).or_default();
+        samples.push_back(point);
+        truncate(samples, CHART_HISTORY_LIMIT);
     }
 
     async fn capture_market_start_prices(&self, reference: &ReferencePrice) {

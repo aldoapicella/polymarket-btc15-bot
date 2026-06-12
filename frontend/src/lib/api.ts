@@ -12,7 +12,7 @@ import type {
   RuntimeConfigPatch,
   Snapshot
 } from "@/lib/types";
-import type { ChartPoint, ChartRange, MarketSeries } from "@/lib/charting";
+import { thinChartPoints, type ChartPoint, type ChartRange, type MarketSeries } from "@/lib/charting";
 
 type FetchOptions = {
   method?: "GET" | "POST";
@@ -165,14 +165,16 @@ export function resumeBot(reason: string) {
 
 function normalizeMarketSeries(payload: unknown, requestedRange: ChartRange): MarketSeries {
   const record = asRecord(payload) ?? {};
-  const marketChart = chartPoints(record.marketChart ?? record.points);
+  const rawMarketChart = chartPoints(record.marketChart ?? record.points);
   const explicitFills = chartPoints(record.fills);
-  const fills = explicitFills.length ? explicitFills : marketChart.filter((point) => point.fillPrice !== undefined);
+  const rawFills = explicitFills.length ? explicitFills : rawMarketChart.filter((point) => point.fillPrice !== undefined);
+  const marketChart = thinChartPoints(rawMarketChart);
+  const fills = thinChartPoints(rawFills, 300);
   const sampleCount =
     numeric(record.sampleCount) ??
     numeric(asRecord(record.summary)?.sample_count) ??
     numeric(asRecord(record.summary)?.sampleCount) ??
-    marketChart.length;
+    rawMarketChart.length;
 
   return {
     source: text(record.source),

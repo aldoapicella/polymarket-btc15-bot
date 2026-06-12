@@ -20,8 +20,8 @@ use tower_http::trace::TraceLayer;
 mod history;
 mod runtime;
 use history::{
-    empty_chart, historical_detail, max_historical_markets, merge_market_lists,
-    overlay_detail_market, MarketHistoryStore,
+    empty_chart, historical_detail, max_historical_markets, merge_chart_payloads,
+    merge_market_lists, overlay_detail_market, MarketHistoryStore,
 };
 use runtime::RuntimeController;
 
@@ -218,30 +218,26 @@ async fn market_chart(
     Query(query): Query<ChartQuery>,
 ) -> Json<Value> {
     let range = query.range.unwrap_or_else(|| "full".to_owned());
-    if let Some(runtime_chart) = state.runtime.market_chart(&market_id, &range).await {
-        let sample_count = runtime_chart
-            .get("summary")
-            .and_then(|summary| summary.get("sample_count"))
-            .and_then(Value::as_u64)
-            .unwrap_or(0);
-        if sample_count > 0 {
-            return Json(runtime_chart);
-        }
-    }
+    let runtime_chart = state.runtime.market_chart(&market_id, &range).await;
     let store = MarketHistoryStore::new(&state.settings);
     match store.chart(&market_id, &range).await {
-        Ok(Some(chart)) => Json(chart),
-        Ok(None) => Json(empty_chart(&market_id, &range)),
+        Ok(Some(chart)) => match runtime_chart {
+            Some(runtime_chart) => Json(merge_chart_payloads(chart, runtime_chart, &range)),
+            None => Json(chart),
+        },
+        Ok(None) => Json(runtime_chart.unwrap_or_else(|| empty_chart(&market_id, &range))),
         Err(error) => {
             tracing::warn!("historical chart table read failed for {market_id}: {error}");
-            Json(json!({
-                "market_id": market_id,
-                "range": range,
-                "points": [],
-                "summary": {
-                    "sample_count": 0
-                },
-                "warning": error
+            Json(runtime_chart.unwrap_or_else(|| {
+                json!({
+                    "market_id": market_id,
+                    "range": range,
+                    "points": [],
+                    "summary": {
+                        "sample_count": 0
+                    },
+                    "warning": error
+                })
             }))
         }
     }

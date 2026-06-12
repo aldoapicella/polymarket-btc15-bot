@@ -61,7 +61,16 @@ export function useRealtimeSnapshot(queryClient: QueryClient) {
 
 function parseRuntimeEvent(data: string): RuntimeEvent | null {
   try {
-    return JSON.parse(data) as RuntimeEvent;
+    const parsed = JSON.parse(data) as RuntimeEvent & { event_type?: unknown };
+    const type = typeof parsed.type === "string" ? parsed.type : typeof parsed.event_type === "string" ? parsed.event_type : "";
+    if (!type) {
+      return null;
+    }
+    return {
+      ...parsed,
+      type,
+      data: parsed.data && typeof parsed.data === "object" && !Array.isArray(parsed.data) ? parsed.data : {}
+    } as RuntimeEvent;
   } catch {
     return null;
   }

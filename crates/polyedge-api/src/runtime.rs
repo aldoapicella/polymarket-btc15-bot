@@ -1,9 +1,11 @@
 mod chart;
+mod chart_history;
 mod recorder;
 mod reference;
 mod view;
 
 use chart::chart_sample_from_data;
+use chart_history::{point_bucket_ms, should_persist, spawn_persist, ChartPersistenceSample};
 use chrono::{DateTime, Utc};
 use polyedge_config::{ExecutionMode, RuntimeSettings};
 use polyedge_domain::{
@@ -59,6 +61,7 @@ struct RuntimeData {
     reference: Option<ReferencePrice>,
     fair_values: BTreeMap<MarketId, Value>,
     chart_samples: BTreeMap<MarketId, VecDeque<Value>>,
+    chart_last_persisted_ms: BTreeMap<MarketId, i64>,
     decisions: VecDeque<TradeDecision>,
     execution_reports: VecDeque<ExecutionReport>,
     recent_events: VecDeque<RuntimeEvent>,
@@ -94,6 +97,7 @@ impl RuntimeController {
             reference: None,
             fair_values: BTreeMap::new(),
             chart_samples: BTreeMap::new(),
+            chart_last_persisted_ms: BTreeMap::new(),
             decisions: VecDeque::new(),
             execution_reports: VecDeque::new(),
             recent_events: VecDeque::new(),
@@ -650,14 +654,36 @@ impl RuntimeController {
     }
 
     async fn push_market_chart_sample(&self, market_id: &MarketId) {
-        let mut data = self.inner.data.write().await;
-        let Some(market) = data.markets.get(market_id).cloned() else {
-            return;
+        let persistence = {
+            let mut data = self.inner.data.write().await;
+            let Some(market) = data.markets.get(market_id).cloned() else {
+                return;
+            };
+            let point = chart_sample_from_data(&market, &data, Utc::now());
+            let bucket_ms = point_bucket_ms(&point);
+            let sample_count = {
+                let samples = data.chart_samples.entry(market_id.clone()).or_default();
+                samples.push_back(point.clone());
+                truncate(samples, CHART_HISTORY_LIMIT);
+                samples.len()
+            };
+            match bucket_ms {
+                Some(bucket_ms)
+                    if should_persist(
+                        data.chart_last_persisted_ms.get(market_id).copied(),
+                        bucket_ms,
+                    ) =>
+                {
+                    data.chart_last_persisted_ms
+                        .insert(market_id.clone(), bucket_ms);
+                    Some(ChartPersistenceSample::new(market, point, sample_count))
+                }
+                _ => None,
+            }
         };
-        let point = chart_sample_from_data(&market, &data, Utc::now());
-        let samples = data.chart_samples.entry(market_id.clone()).or_default();
-        samples.push_back(point);
-        truncate(samples, CHART_HISTORY_LIMIT);
+        if let Some(sample) = persistence {
+            spawn_persist(self.inner.settings.clone(), sample);
+        };
     }
 
     async fn capture_market_start_prices(&self, reference: &ReferencePrice) {
@@ -814,8 +840,10 @@ impl RuntimeController {
         };
         let recorder_inner = self.inner.clone();
         let recorder_event = event.clone();
-        tokio::task::spawn_blocking(move || {
-            let mut recorder = recorder_inner.recorder.lock().unwrap();
+        std::thread::spawn(move || {
+            let Ok(mut recorder) = recorder_inner.recorder.try_lock() else {
+                return;
+            };
             if let Err(error) = recorder.record(&recorder_event) {
                 warn!("runtime recorder failed: {error}");
             }

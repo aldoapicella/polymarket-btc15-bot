@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getLatestReport, getMarketChart, getSnapshot } from "@/lib/api";
-import { emptyMarketSeries } from "@/lib/charting";
+import { emptyMarketSeries, mergeRuntimeEventsIntoSeries } from "@/lib/charting";
 import { ageText } from "@/lib/format";
 import { ActiveMarketPanel } from "@/components/dashboard/ActiveMarketPanel";
 import { ControlPanel } from "@/components/dashboard/ControlPanel";
@@ -41,9 +41,15 @@ export function Dashboard() {
     queryKey: ["markets", "chart", active?.market_id ?? "none", "full"],
     queryFn: () => getMarketChart(active?.market_id ?? "", "full"),
     enabled: Boolean(active?.market_id),
-    refetchInterval: 3000
+    refetchInterval: 30000
   });
-  const seriesStore = chartSeries.data ?? emptyMarketSeries(active);
+  const seriesStore = mergeRuntimeEventsIntoSeries(
+    chartSeries.data ?? emptyMarketSeries(active),
+    eventTape,
+    active?.market_id,
+    active,
+    "full"
+  );
 
   return (
     <div className="space-y-5">

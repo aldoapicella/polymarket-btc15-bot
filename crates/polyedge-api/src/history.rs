@@ -181,6 +181,45 @@ pub fn empty_chart(market_id: &str, range: &str) -> Value {
     })
 }
 
+pub fn merge_chart_payloads(historical: Value, runtime: Value, range: &str) -> Value {
+    let mut points_by_bucket = BTreeMap::new();
+    for point in chart_points(&historical) {
+        if let Some(bucket) = point_bucket(&point) {
+            points_by_bucket.insert(bucket, point);
+        }
+    }
+    for point in chart_points(&runtime) {
+        if let Some(bucket) = point_bucket(&point) {
+            let merged = points_by_bucket
+                .remove(&bucket)
+                .map(|historical| merge_point_payloads(historical, point.clone()))
+                .unwrap_or(point);
+            points_by_bucket.insert(bucket, merged);
+        }
+    }
+    let mut points = points_by_bucket.into_values().collect::<Vec<_>>();
+    filter_chart_range(&mut points, range);
+    let domain = runtime
+        .get("domain")
+        .cloned()
+        .or_else(|| historical.get("domain").cloned())
+        .or_else(|| point_domain(&points));
+    let sample_count = summary_sample_count(&historical)
+        .max(summary_sample_count(&runtime))
+        .max(points.len());
+    json!({
+        "source": "azure_table+rust_runtime_memory",
+        "market_id": value_text(&runtime, "market_id")
+            .or_else(|| value_text(&historical, "market_id")),
+        "range": range,
+        "points": points,
+        "domain": domain,
+        "summary": {
+            "sample_count": sample_count
+        }
+    })
+}
+
 fn load_catalog_entity_sync(
     settings: &RuntimeSettings,
     market_id: &str,
@@ -213,7 +252,7 @@ fn load_catalog_entity_with_client(
     Ok(entities.into_iter().next())
 }
 
-fn table_client(settings: &RuntimeSettings) -> Option<AzureTableClient> {
+pub(crate) fn table_client(settings: &RuntimeSettings) -> Option<AzureTableClient> {
     let account = settings.azure.storage_account_name.as_ref()?;
     match env::var("AZURE_STORAGE_ACCOUNT_KEY") {
         Ok(account_key) if !account_key.trim().is_empty() => {
@@ -344,6 +383,45 @@ fn merge_market_payloads(historical: Value, live: Value) -> Value {
         }
     }
     Value::Object(merged)
+}
+
+fn chart_points(payload: &Value) -> Vec<Value> {
+    payload
+        .get("points")
+        .or_else(|| payload.get("marketChart"))
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default()
+}
+
+fn merge_point_payloads(historical: Value, runtime: Value) -> Value {
+    let (Some(mut historical), Some(runtime)) =
+        (historical.as_object().cloned(), runtime.as_object())
+    else {
+        return runtime;
+    };
+    for (key, value) in runtime {
+        if !value.is_null() {
+            historical.insert(key.clone(), value.clone());
+        }
+    }
+    Value::Object(historical)
+}
+
+fn summary_sample_count(payload: &Value) -> usize {
+    payload
+        .get("summary")
+        .and_then(|summary| {
+            summary
+                .get("sample_count")
+                .or_else(|| summary.get("sampleCount"))
+        })
+        .and_then(|value| match value {
+            Value::Number(number) => number.as_u64().map(|value| value as usize),
+            Value::String(text) => text.parse().ok(),
+            _ => None,
+        })
+        .unwrap_or(0)
 }
 
 fn normalize_historical_market_state(object: &mut serde_json::Map<String, Value>) {
@@ -510,5 +588,35 @@ mod tests {
         assert_eq!(point["qUp"], 0.52);
         assert_eq!(point["upBid"], 0.51);
         assert_eq!(point["fillOutcome"], "up");
+    }
+
+    #[test]
+    fn chart_payload_merge_keeps_persisted_history_and_runtime_tail() {
+        let historical = json!({
+            "market_id": "m1",
+            "range": "full",
+            "points": [
+                {"bucket": 1000, "time": "2026-06-11T10:00:01Z", "qUp": 0.50},
+                {"bucket": 2000, "time": "2026-06-11T10:00:02Z", "qUp": 0.51}
+            ],
+            "summary": {"sample_count": 2}
+        });
+        let runtime = json!({
+            "market_id": "m1",
+            "range": "full",
+            "points": [
+                {"bucket": 2000, "time": "2026-06-11T10:00:02Z", "upBid": 0.52},
+                {"bucket": 3000, "time": "2026-06-11T10:00:03Z", "qUp": 0.53}
+            ],
+            "summary": {"sample_count": 2}
+        });
+
+        let merged = merge_chart_payloads(historical, runtime, "full");
+        let points = merged["points"].as_array().expect("points");
+
+        assert_eq!(points.len(), 3);
+        assert_eq!(points[1]["qUp"], 0.51);
+        assert_eq!(points[1]["upBid"], 0.52);
+        assert_eq!(merged["summary"]["sample_count"], 3);
     }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -9,17 +9,21 @@ import { getMarketChart, getMarketDetail } from "@/lib/api";
 import {
   emptyMarketSeries,
   formatChartTime,
+  mergeRuntimeEventsIntoSeries,
   rangeLabel,
   type ChartRange,
   type ChartPoint
 } from "@/lib/charting";
 import { compact, dateTime, numberText, pctText } from "@/lib/format";
+import { useRealtimeSnapshot } from "@/components/dashboard/useRealtimeSnapshot";
 import { EmptyState, IconButton, InfoHint, Panel, PanelHeader, Pill } from "@/components/ui";
 
 const RANGE_FILTERS: ChartRange[] = ["full", "5m", "1m"];
 
 export function MarketDetailPage({ marketId }: { marketId: string }) {
+  const queryClient = useQueryClient();
   const [range, setRange] = useState<ChartRange>("full");
+  const eventTape = useRealtimeSnapshot(queryClient);
   const detail = useQuery({
     queryKey: ["markets", marketId],
     queryFn: () => getMarketDetail(marketId),
@@ -28,12 +32,12 @@ export function MarketDetailPage({ marketId }: { marketId: string }) {
   const chart = useQuery({
     queryKey: ["markets", "chart", marketId, range],
     queryFn: () => getMarketChart(marketId, range),
-    refetchInterval: 3000
+    refetchInterval: 30000
   });
 
   const data = detail.data;
   const market = data?.market;
-  const series = chart.data ?? emptyMarketSeries(market, range);
+  const series = mergeRuntimeEventsIntoSeries(chart.data ?? emptyMarketSeries(market, range), eventTape, marketId, market, range);
 
   return (
     <div className="space-y-5">
@@ -52,7 +56,13 @@ export function MarketDetailPage({ marketId }: { marketId: string }) {
             <p className="truncate text-xs text-ink/50">{marketId}</p>
           </div>
         </div>
-        <IconButton label="Refresh market" onClick={() => detail.refetch()}>
+        <IconButton
+          label="Refresh market"
+          onClick={() => {
+            detail.refetch();
+            chart.refetch();
+          }}
+        >
           <RefreshCw className="h-4 w-4" />
         </IconButton>
       </div>

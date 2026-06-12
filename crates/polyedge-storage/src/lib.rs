@@ -529,6 +529,28 @@ impl AzureTableClient {
         Ok(entities)
     }
 
+    pub fn insert_or_merge_entity(
+        &mut self,
+        table: &str,
+        entity: &Value,
+    ) -> Result<(), AzureBlobError> {
+        let partition_key = entity
+            .get("PartitionKey")
+            .and_then(Value::as_str)
+            .ok_or_else(|| AzureBlobError::Transport("missing Table PartitionKey".to_owned()))?;
+        let row_key = entity
+            .get("RowKey")
+            .and_then(Value::as_str)
+            .ok_or_else(|| AzureBlobError::Transport("missing Table RowKey".to_owned()))?;
+        match self.insert_entity(table, entity) {
+            Ok(()) => Ok(()),
+            Err(AzureBlobError::HttpStatus(409)) => {
+                self.merge_entity(table, partition_key, row_key, entity)
+            }
+            Err(error) => Err(error),
+        }
+    }
+
     fn query_page(
         &mut self,
         table: &str,
@@ -559,9 +581,10 @@ impl AzureTableClient {
             "https://{}.table.core.windows.net/{}()?{}",
             self.account, table, query
         );
+        let resource_path = format!("{table}()");
         for attempt in 0..AZURE_BLOB_MAX_ATTEMPTS {
             let date = rfc1123_now();
-            let authorization = self.table_authorization(table, &date)?;
+            let authorization = self.table_authorization(&resource_path, &date)?;
             let response = self
                 .agent
                 .get(&url)
@@ -596,13 +619,88 @@ impl AzureTableClient {
         unreachable!("Azure Table retry loop always returns");
     }
 
-    fn table_authorization(&mut self, table: &str, date: &str) -> Result<String, AzureBlobError> {
+    fn insert_entity(&mut self, table: &str, entity: &Value) -> Result<(), AzureBlobError> {
+        let url = format!("https://{}.table.core.windows.net/{}", self.account, table);
+        self.send_table_entity("POST", &url, table, entity)
+    }
+
+    fn merge_entity(
+        &mut self,
+        table: &str,
+        partition_key: &str,
+        row_key: &str,
+        entity: &Value,
+    ) -> Result<(), AzureBlobError> {
+        let resource_path = table_entity_path(table, partition_key, row_key);
+        let url = format!(
+            "https://{}.table.core.windows.net/{}",
+            self.account, resource_path
+        );
+        self.send_table_entity("MERGE", &url, &resource_path, entity)
+    }
+
+    fn send_table_entity(
+        &mut self,
+        method: &str,
+        url: &str,
+        resource_path: &str,
+        entity: &Value,
+    ) -> Result<(), AzureBlobError> {
+        let body = serde_json::to_string(entity)?;
+        for attempt in 0..AZURE_BLOB_MAX_ATTEMPTS {
+            let date = rfc1123_now();
+            let authorization = self.table_authorization(resource_path, &date)?;
+            let request = self
+                .agent
+                .request(method, url)
+                .set("authorization", &authorization)
+                .set("x-ms-version", AZURE_BLOB_API_VERSION)
+                .set("x-ms-date", &date)
+                .set("Date", &date)
+                .set("Accept", "application/json;odata=nometadata")
+                .set("Content-Type", "application/json")
+                .set("DataServiceVersion", "3.0;NetFx")
+                .set("MaxDataServiceVersion", "3.0;NetFx")
+                .set("Prefer", "return-no-content");
+            let request = if method == "MERGE" {
+                request.set("If-Match", "*")
+            } else {
+                request
+            };
+            match request.send_string(&body) {
+                Ok(_) => return Ok(()),
+                Err(ureq::Error::Status(status, _))
+                    if is_retryable_azure_status(status)
+                        && attempt + 1 < AZURE_BLOB_MAX_ATTEMPTS =>
+                {
+                    thread::sleep(retry_delay(attempt));
+                }
+                Err(ureq::Error::Status(status, _)) => {
+                    return Err(AzureBlobError::HttpStatus(status));
+                }
+                Err(ureq::Error::Transport(error)) if attempt + 1 < AZURE_BLOB_MAX_ATTEMPTS => {
+                    thread::sleep(retry_delay(attempt));
+                    let _ = error;
+                }
+                Err(ureq::Error::Transport(error)) => {
+                    return Err(AzureBlobError::Transport(error.to_string()));
+                }
+            }
+        }
+        unreachable!("Azure Table entity retry loop always returns");
+    }
+
+    fn table_authorization(
+        &mut self,
+        resource_path: &str,
+        date: &str,
+    ) -> Result<String, AzureBlobError> {
         match &mut self.auth {
             AzureTableAuth::ManagedIdentity(token) => {
                 Ok(format!("Bearer {}", token.access_token(&self.agent)?))
             }
             AzureTableAuth::SharedKey(account_key) => {
-                shared_key_lite_header(&self.account, account_key, table, date)
+                shared_key_lite_header(&self.account, account_key, resource_path, date)
             }
         }
     }
@@ -611,18 +709,31 @@ impl AzureTableClient {
 fn shared_key_lite_header(
     account: &str,
     account_key: &str,
-    table: &str,
+    resource_path: &str,
     date: &str,
 ) -> Result<String, AzureBlobError> {
     let key = general_purpose::STANDARD
         .decode(account_key.trim())
         .map_err(|error| AzureBlobError::InvalidStorageKey(error.to_string()))?;
-    let string_to_sign = format!("{date}\n/{account}/{table}()");
+    let string_to_sign = format!("{date}\n/{account}/{resource_path}");
     let mut mac = HmacSha256::new_from_slice(&key)
         .map_err(|error| AzureBlobError::InvalidStorageKey(error.to_string()))?;
     mac.update(string_to_sign.as_bytes());
     let signature = general_purpose::STANDARD.encode(mac.finalize().into_bytes());
     Ok(format!("SharedKeyLite {account}:{signature}"))
+}
+
+fn table_entity_path(table: &str, partition_key: &str, row_key: &str) -> String {
+    format!(
+        "{}(PartitionKey='{}',RowKey='{}')",
+        table,
+        odata_key(partition_key),
+        odata_key(row_key)
+    )
+}
+
+fn odata_key(value: &str) -> String {
+    value.replace('\'', "''")
 }
 
 fn parse_table_response(response: ureq::Response) -> Result<AzureTablePage, AzureBlobError> {
